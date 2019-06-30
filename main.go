@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// On enter press erase the line above and send true to the channel.
+// This lets the main loop know to split.
 func waitForEnter(enter chan bool) {
 	var s string
 	fmt.Scanln(&s)
@@ -29,29 +31,47 @@ func nToTime(n int) string {
 }
 
 func main() {
-	// Wait for the user to push enter.
+	db := initDB()
+	category := os.Args[1]
+	s := getSplitNames(db, category)
+	if s == nil {
+		setupCategory(db, category)
+	}
+
+	// TODO remove.
+	/*
+		splits := []SplitName{
+			SplitName{Name: "1 star battlefield"},
+			SplitName{Name: "5 stars whomps"},
+			SplitName{Name: "8 stars snow"},
+			SplitName{Name: "dark world"},
+			SplitName{Name: "11 star fire"},
+			SplitName{Name: "12 star sand"},
+			SplitName{Name: "15 star underground"},
+			SplitName{Name: "16 star sub"},
+			SplitName{Name: "fire sea"},
+			SplitName{Name: "sky world"},
+		}
+	*/
+	startSplits(nil)
+}
+
+func startSplits(splits []SplitName) {
 	enter := make(chan bool)
 	go waitForEnter(enter)
 
 	start := time.Now()
+
+	// The duration of the run.
 	var elapsed time.Duration
+
+	// The current time string.
 	var t string
 
-	splits := []string{
-		"1 star battlefield",
-		"5 stars whomps",
-		"8 stars snow",
-		"dark world",
-		"10 star fire",
-		"11 star sand",
-		"15 star underground",
-		"16 star sub",
-		"fire sea",
-		"sky world",
-	}
-	i := 0
+	// Tracks the index of the run splits.
+	var i int
 
-	fmt.Println("")
+	// Proccess milliseconds, enter presses, and db calls async.
 	for {
 		t = fmt.Sprintf("%s%s%s%d",
 			nToTime(int(elapsed.Hours())%24),
@@ -64,7 +84,7 @@ func main() {
 			elapsed = time.Since(start)
 			fmt.Printf("%s\r", t)
 		case <-enter:
-			fmt.Printf("\n%s -> %s\n", splits[i], t)
+			fmt.Printf("\n%s -> %s\n", splits[i].Name, t)
 			i++
 			if i == len(splits) {
 				fmt.Print("\n=================\n")
