@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	// Driver for sql
-	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"time"
 )
@@ -11,9 +10,9 @@ import (
 // Category models a speed running category.
 // Example: Mario 64 16 star
 type Category struct {
-	ID       int64
-	Game     string
-	Category string
+	ID         int64
+	Name       string
+	SplitNames []string
 }
 
 // Run models a single run of category.
@@ -58,8 +57,7 @@ func createTables(db *sql.DB) {
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS category(
                         id INTEGER PRIMARY KEY,
-	                game TEXT,
-	                category TEXT
+	                name TEXT
                  );`,
 		`CREATE TABLE IF NOT EXISTS run(
                         id INTEGER PRIMARY KEY,
@@ -89,12 +87,13 @@ func createTables(db *sql.DB) {
 
 }
 
-func getSplitNames(db *sql.DB, category string) []SplitName {
+// Returns an order list of split names for the category.
+func getSplitNames(db *sql.DB, category string) []string {
 	query := `
         SELECT sn.name
         FROM split_name AS sn
         JOIN category AS c ON c.id = sn.category_id
-        WHERE c.category = ?
+        WHERE c.name = ?
         ORDER BY sn.position`
 
 	rows, err := db.Query(query, category)
@@ -103,10 +102,10 @@ func getSplitNames(db *sql.DB, category string) []SplitName {
 	}
 	defer rows.Close()
 
-	var result []SplitName
+	var result []string
+	var n string
 	for rows.Next() {
-		n := SplitName{}
-		if err := rows.Scan(&n.Name); err != nil {
+		if err := rows.Scan(&n); err != nil {
 			panic(err)
 		}
 		result = append(result, n)
@@ -114,7 +113,6 @@ func getSplitNames(db *sql.DB, category string) []SplitName {
 	return result
 }
 
-func setupCategory(db *sql.DB, category string) []SplitName {
-	fmt.Printf("%s not found; setting up", category)
+func setupCategory(db *sql.DB, category string) []string {
 	return nil
 }
