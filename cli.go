@@ -8,21 +8,20 @@ import (
 )
 
 // Walks the user through setting up a new category.
-func categoryWizard(category string) Category {
+func categoryWizard(category string) *Category {
 	scanner := bufio.NewScanner(os.Stdin)
 	// TODO prompt user for existing categories.
 	if category == "" {
 		fmt.Println("No category was provided, example:\n$ gsplits mario64 16 star\n")
-		fmt.Println("Setup new category?")
+		fmt.Println("Setup new category?\n")
 		promptYN()
 		fmt.Print("New category name: ")
 		scanner.Scan()
 		category = scanner.Text()
 	} else {
-		fmt.Printf("category '%s' not found\n\n", category)
+		fmt.Printf("Set up new category '%s'?\n", category)
+		promptYN()
 	}
-	fmt.Printf("Set up new category '%s'?\n", category)
-	promptYN()
 	var splitNames []string
 	var splitName string
 	i := 0
@@ -45,7 +44,7 @@ func categoryWizard(category string) Category {
 	fmt.Println("start?")
 	promptYN()
 
-	return Category{
+	return &Category{
 		Name:       category,
 		SplitNames: splitNames,
 	}

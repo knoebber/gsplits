@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
@@ -33,15 +34,17 @@ func nToTime(n int) string {
 
 func main() {
 	db := initDB()
+	defer db.Close()
+
 	category := strings.Join(os.Args[1:], " ")
 
-	var splitNames []string
+	var c *Category
 
-	// Try to get the split names from the database by the passed in category name.
-	splitNames = getSplitNames(db, category)
-	if splitNames == nil {
+	// Try to get the category from the database by the passed in name.
+	c = getCategory(db, category)
+	if c == nil {
 		// Use the category wizard to either create or get an existing category.
-		splitNames = useCategory(categoryWizard(category))
+		c = useCategory(db, categoryWizard(category))
 	}
 
 	// TODO remove.
@@ -59,18 +62,18 @@ func main() {
 			SplitName{Name: "sky world"},
 		}
 	*/
-	startSplits(splitNames)
+	startSplits(c)
 }
 
-func useCategory(c Category) []string {
+func useCategory(db *sql.DB, c *Category) *Category {
 	if c.ID == 0 {
-		// Category is new and needs to be saved.
+		createCategory(db, c)
 	}
-	return c.SplitNames
+	return c
 }
 
-func startSplits(splits []string) {
-	if len(splits) == 0 {
+func startSplits(c *Category) {
+	if len(c.SplitNames) == 0 {
 		panic("splits is empty!")
 	}
 
@@ -101,9 +104,9 @@ func startSplits(splits []string) {
 			elapsed = time.Since(start)
 			fmt.Printf("%s\r", t)
 		case <-enter:
-			fmt.Printf("\n%s -> %s\n", splits[i], t)
+			fmt.Printf("\n%s -> %s\n", c.SplitNames[i], t)
 			i++
-			if i == len(splits) {
+			if i == len(c.SplitNames) {
 				fmt.Print("\n=================\n")
 				fmt.Print(t)
 				fmt.Print("\n=================\n")

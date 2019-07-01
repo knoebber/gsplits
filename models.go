@@ -87,10 +87,17 @@ func createTables(db *sql.DB) {
 
 }
 
+func createCategory(db *sql.DB, c *Category) {
+	_, err := db.Exec("INSERT INTO category(name) values(?)", c.Name)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Returns an order list of split names for the category.
-func getSplitNames(db *sql.DB, category string) []string {
+func getCategory(db *sql.DB, category string) *Category {
 	query := `
-        SELECT sn.name
+        SELECT c.id, sn.name
         FROM split_name AS sn
         JOIN category AS c ON c.id = sn.category_id
         WHERE c.name = ?
@@ -102,17 +109,23 @@ func getSplitNames(db *sql.DB, category string) []string {
 	}
 	defer rows.Close()
 
-	var result []string
-	var n string
+	var (
+		splits    []string
+		splitName string
+		id        int64
+	)
+
 	for rows.Next() {
-		if err := rows.Scan(&n); err != nil {
+		if err := rows.Scan(&id, &splitName); err != nil {
 			panic(err)
 		}
-		result = append(result, n)
+		splits = append(splits, splitName)
 	}
-	return result
-}
-
-func setupCategory(db *sql.DB, category string) []string {
-	return nil
+	if len(splits) == 0 {
+		return nil
+	}
+	return &Category{
+		ID:         id,
+		SplitNames: splits,
+	}
 }
