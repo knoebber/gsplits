@@ -2,70 +2,133 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
-// Walks the user through setting up a new category.
-func categoryWizard(category string) *Category {
+const divider = "=========="
+
+func setupNewCategory(db *sql.DB) *Category {
 	scanner := bufio.NewScanner(os.Stdin)
-	// TODO prompt user for existing categories.
-	if category == "" {
-		fmt.Println("No category was provided, example:\n$ gsplits mario64 16 star\n")
-		fmt.Println("Setup new category?\n")
-		promptYN()
-		fmt.Print("New category name: ")
-		scanner.Scan()
-		category = scanner.Text()
-	} else {
-		fmt.Printf("Set up new category '%s'?\n", category)
-		promptYN()
-	}
-	var splitNames []string
-	var splitName string
+	fmt.Printf("New category name: ")
+	scanner.Scan()
+	return createCategory(db, &Category{Name: scanner.Text()})
+}
+
+func setupNewRoute(db *sql.DB, categoryID int64) *Route {
+	var (
+		splitNames   []SplitName
+		splitName    SplitName
+		newRouteName string
+	)
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Print("New route name: ")
+	scanner.Scan()
+	newRouteName = scanner.Text()
+
 	i := 0
-	fmt.Print("\n\n====================\n\n")
+
+	fmt.Printf("%s\n", divider)
 	fmt.Println("Input the names of each split")
 	fmt.Println("Push enter without input to finish")
+	fmt.Println("")
 	for {
-		fmt.Printf("%d.) ", i)
+		fmt.Printf("%d.) ", i+1)
 		scanner.Scan()
-		splitName = scanner.Text()
+		splitName = SplitName{Name: scanner.Text()}
 		i++
-		if splitName == "" {
+		if splitName.Name == "" {
 			break
 		}
 		splitNames = append(splitNames, splitName)
 	}
-	printCategorySplits(category, splitNames)
-	fmt.Println("save?")
-	promptYN()
-	fmt.Println("start?")
-	promptYN()
 
-	return &Category{
-		Name:       category,
-		SplitNames: splitNames,
+	r := &Route{Name: newRouteName, Splits: splitNames, CategoryID: categoryID}
+	exitWhenNo("Save?")
+	return createRoute(db, r)
+}
+
+// Walks the user through setting up or getting an existing category and route.
+func wizard(db *sql.DB, routeName string) *Route {
+	var (
+		c *Category
+		r *Route
+	)
+
+	categories := getCategories(db)
+	if len(categories) == 0 || !promptYN("Use existing category?") {
+		c = setupNewCategory(db)
+	} else {
+		fmt.Println("Choose a category")
+		for i, category := range categories {
+			fmt.Printf("(%d) %s\n", i+1, category.Name)
+		}
+		c = &categories[promptListSelect(len(categories))-1]
+	}
+
+	routes := getRoutesByCategory(db, c.ID)
+
+	if len(routes) == 0 || !promptYN("Use existing route?") {
+		r = setupNewRoute(db, c.ID)
+	} else {
+		fmt.Println("Choose an existing route: ")
+		for i, route := range routes {
+			fmt.Printf("(%d) %s\n", i+1, route.Name)
+		}
+		r = routes[promptListSelect(len(categories))-1]
+	}
+	return r
+}
+
+// TODO update to show stats (golds etc).
+// TODO show category
+func printRouteSplits(r *Route) {
+	fmt.Printf("\n%s %s %s\n", divider, r.Name, divider)
+	for i, s := range r.Splits {
+		fmt.Printf("%d). %s\n", i+1, s.Name)
 	}
 }
 
-func printCategorySplits(category string, names []string) {
-	fmt.Printf("\n==== %s ====\n", category)
-	for i, name := range names {
-		fmt.Printf("%d.) %s\n", i, name)
-	}
-}
-
-func promptYN() {
-	var a string
+func promptListSelect(max int) int {
+	var (
+		a   string
+		i   int
+		err error
+	)
 	for {
-		fmt.Print("(Y\\n): ")
+		fmt.Print("Option number: ")
+		fmt.Scanln(&a)
+		i, err = strconv.Atoi(a)
+		if err == nil && i <= max {
+			return i
+		}
+	}
+	return 0
+}
+
+func promptYN(prompt string) bool {
+	var a string
+	if prompt != "" {
+		fmt.Println(prompt)
+	}
+	for {
+		fmt.Print("(Y\\n) ")
 		fmt.Scanln(&a)
 		if strings.ToLower(a) == "y" {
-			return
+			return true
 		} else if strings.ToLower(a) == "n" {
-			os.Exit(0)
+			return false
 		}
+	}
+}
+
+func exitWhenNo(prompt string) {
+	if !promptYN(prompt) {
+		os.Exit(0)
 	}
 }

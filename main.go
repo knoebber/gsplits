@@ -18,7 +18,6 @@ func waitForEnter(enter chan bool) {
 	eraseLine := "\x1b[2K"
 	fmt.Printf("%s%s", upLine, eraseLine)
 	enter <- true
-
 }
 
 func nToTime(n int) string {
@@ -32,48 +31,54 @@ func nToTime(n int) string {
 	return s + ":"
 }
 
+func formatTimeElapsed(d time.Duration) string {
+	seconds := strconv.Itoa(int(d.Seconds()) % 60)
+	if len(seconds) == 1 {
+		seconds = "0" + seconds
+	}
+
+	return fmt.Sprintf("%s%s%s.%d",
+		nToTime(int(d.Hours())%24),
+		nToTime(int(d.Minutes())%60),
+		seconds,
+		int(d.Nanoseconds()/1e7)%100) // Show hundreths of a second.
+}
+
 func main() {
 	db := initDB()
 	defer db.Close()
 
-	category := strings.Join(os.Args[1:], " ")
+	route := strings.Join(os.Args[1:], " ")
 
-	var c *Category
+	var r *Route
 
-	// Try to get the category from the database by the passed in name.
-	c = getCategory(db, category)
-	if c == nil {
-		// Use the category wizard to either create or get an existing category.
-		c = useCategory(db, categoryWizard(category))
-	}
-
-	// TODO remove.
-	/*
-		splits := []SplitName{
-			SplitName{Name: "1 star battlefield"},
-			SplitName{Name: "5 stars whomps"},
-			SplitName{Name: "8 stars snow"},
-			SplitName{Name: "dark world"},
-			SplitName{Name: "11 star fire"},
-			SplitName{Name: "12 star sand"},
-			SplitName{Name: "15 star underground"},
-			SplitName{Name: "16 star sub"},
-			SplitName{Name: "fire sea"},
-			SplitName{Name: "sky world"},
+	// Try to get the route from the database by the passed in name.
+	// TODO get category as well.
+	r = getRoute(db, route)
+	if r == nil {
+		if route != "" {
+			fmt.Printf("route '%s' not found\n", route)
 		}
-	*/
-	startSplits(c)
-}
-
-func useCategory(db *sql.DB, c *Category) *Category {
-	if c.ID == 0 {
-		createCategory(db, c)
+		// Use the category wizard to either create or get an existing category.
+		r = wizard(db, route)
 	}
-	return c
+
+	printRouteSplits(r)
+	exitWhenNo("Start? ")
+	fmt.Printf("\n%s %s %s\n\n", divider, r.Name, divider)
+	startSplits(r, db)
 }
 
-func startSplits(c *Category) {
-	if len(c.SplitNames) == 0 {
+func startSplits(r *Route, db *sql.DB) {
+	var (
+		totalElapsed time.Duration
+		splitElapsed time.Duration
+		total        string
+		split        string
+		i            int
+	)
+
+	if len(r.Splits) == 0 {
 		panic("splits is empty!")
 	}
 
@@ -81,35 +86,47 @@ func startSplits(c *Category) {
 	go waitForEnter(enter)
 
 	start := time.Now()
+	lastSplitEnd := time.Now()
 
 	// The duration of the run.
-	var elapsed time.Duration
 
-	// The current time string.
-	var t string
+	// The database model for saving the run.
+	run := &Run{
+		RouteID: r.ID,
+		Splits:  make([]Split, len(r.Splits)),
+	}
 
-	// Tracks the index of the run splits.
-	var i int
-
-	// Proccess milliseconds, enter presses, and db calls async.
 	for {
-		t = fmt.Sprintf("%s%s%s%d",
-			nToTime(int(elapsed.Hours())%24),
-			nToTime(int(elapsed.Minutes())%60),
-			nToTime(int(elapsed.Seconds())%60),
-			int(elapsed.Nanoseconds())/1000%100)
-
+		total = formatTimeElapsed(totalElapsed)
+		split = formatTimeElapsed(splitElapsed)
+		// Proccess milliseconds and enter presses async.
 		select {
 		case <-time.After(time.Millisecond):
-			elapsed = time.Since(start)
-			fmt.Printf("%s\r", t)
+			totalElapsed = time.Since(start)
+			splitElapsed = time.Since(lastSplitEnd)
+			fmt.Printf("TOTAL: %s\t\tSPLIT: %s\r", total, split)
 		case <-enter:
-			fmt.Printf("\n%s -> %s\n", c.SplitNames[i], t)
+			fmt.Println(r.Splits[i].Name)
+			fmt.Printf("TOTAL: %s\t\tSPLIT: %s\n", total, split)
+			fmt.Printf("%s\n", divider)
+			run.Splits[i] = Split{
+				SplitNameID:  r.Splits[i].ID,
+				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
+			}
+
+			lastSplitEnd = time.Now()
+
 			i++
-			if i == len(c.SplitNames) {
-				fmt.Print("\n=================\n")
-				fmt.Print(t)
-				fmt.Print("\n=================\n")
+
+			if i == len(r.Splits) {
+				fmt.Printf("\n%s\n", divider)
+				fmt.Printf("FINISH! %s\n", total)
+				fmt.Printf("%s\n", divider)
+
+				if promptYN("Save?") {
+					run.Milliseconds = totalElapsed.Nanoseconds() / 1e6
+					saveRun(db, run)
+				}
 				os.Exit(0)
 			}
 			go waitForEnter(enter)
