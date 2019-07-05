@@ -212,9 +212,12 @@ func getRoutesByCategory(db *sql.DB, categoryID int64) []*Route {
 		route, exists = routeMap[routeID]
 		if !exists {
 			route = &Route{
-				ID:     routeID,
-				Name:   routeName,
-				Splits: []SplitName{{Name: splitName}},
+				ID:   routeID,
+				Name: routeName,
+				Splits: []SplitName{{
+					Name: splitName,
+					ID:   splitID,
+				}},
 			}
 			result = append(result, route)
 			routeMap[routeID] = route
