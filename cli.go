@@ -20,8 +20,8 @@ func setupNewCategory(db *sql.DB) *Category {
 
 func setupNewRoute(db *sql.DB, c *Category) *Route {
 	var (
-		splitNames   []SplitName
-		splitName    SplitName
+		splitNames   []*SplitName
+		splitName    *SplitName
 		newRouteName string
 	)
 
@@ -40,7 +40,7 @@ func setupNewRoute(db *sql.DB, c *Category) *Route {
 	for {
 		fmt.Printf("%d.) ", i+1)
 		scanner.Scan()
-		splitName = SplitName{Name: scanner.Text()}
+		splitName = &SplitName{Name: scanner.Text()}
 		i++
 		if splitName.Name == "" {
 			break
@@ -72,7 +72,7 @@ func wizard(db *sql.DB, routeName string) *Route {
 		for i, category := range categories {
 			fmt.Printf("(%d) %s\n", i+1, category.Name)
 		}
-		c = &categories[promptListSelect(len(categories))-1]
+		c = &categories[promptListSelect(len(categories))]
 	}
 
 	routes := getRoutesByCategory(db, c.ID)
@@ -80,11 +80,14 @@ func wizard(db *sql.DB, routeName string) *Route {
 	if len(routes) == 0 || !promptYN("Use existing route?") {
 		r = setupNewRoute(db, c)
 	} else {
-		fmt.Println("Choose an existing route: ")
+		fmt.Println("Choose a route")
 		for i, route := range routes {
 			fmt.Printf("(%d) %s\n", i+1, route.Name)
 		}
-		r = routes[promptListSelect(len(categories))-1]
+		r = getRoute(db, routes[promptListSelect(len(routes))].ID, "")
+		if r == nil {
+			panic("route is nil")
+		}
 	}
 	return r
 }
@@ -98,6 +101,8 @@ func printRouteSplits(r *Route) {
 	}
 }
 
+// Presents a prompt to the user to pick an option number.
+// Assumes that the list shown is 1 indexed.
 func promptListSelect(max int) int {
 	var (
 		a   string
@@ -108,8 +113,8 @@ func promptListSelect(max int) int {
 		fmt.Print("Option number: ")
 		fmt.Scanln(&a)
 		i, err = strconv.Atoi(a)
-		if err == nil && i <= max {
-			return i
+		if err == nil && i <= max && i > 0 {
+			return i - 1
 		}
 	}
 	return 0

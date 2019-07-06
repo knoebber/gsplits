@@ -48,13 +48,13 @@ func main() {
 	db := initDB()
 	defer db.Close()
 
-	route := strings.Join(os.Args[1:], " ")
+	route := strings.TrimSpace(strings.Join(os.Args[1:], " "))
 
 	var r *Route
 
 	// Try to get the route from the database by the passed in name.
 	// TODO get category as well.
-	r = getRoute(db, route)
+	r = getRoute(db, 0, route)
 	if r == nil {
 		if route != "" {
 			fmt.Printf("route '%s' not found\n", route)
