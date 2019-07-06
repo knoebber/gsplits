@@ -88,12 +88,10 @@ func startSplits(r *Route, db *sql.DB) {
 	start := time.Now()
 	lastSplitEnd := time.Now()
 
-	// The duration of the run.
-
 	// The database model for saving the run.
 	run := &Run{
-		RouteID: r.ID,
-		Splits:  make([]Split, len(r.Splits)),
+		Route:  r,
+		Splits: make([]Split, len(r.Splits)),
 	}
 
 	for {

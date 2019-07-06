@@ -18,7 +18,7 @@ func setupNewCategory(db *sql.DB) *Category {
 	return createCategory(db, &Category{Name: scanner.Text()})
 }
 
-func setupNewRoute(db *sql.DB, categoryID int64) *Route {
+func setupNewRoute(db *sql.DB, c *Category) *Route {
 	var (
 		splitNames   []SplitName
 		splitName    SplitName
@@ -48,12 +48,16 @@ func setupNewRoute(db *sql.DB, categoryID int64) *Route {
 		splitNames = append(splitNames, splitName)
 	}
 
-	r := &Route{Name: newRouteName, Splits: splitNames, CategoryID: categoryID}
+	r := &Route{
+		Name:     newRouteName,
+		Splits:   splitNames,
+		Category: c,
+	}
 	exitWhenNo("Save?")
 	return createRoute(db, r)
 }
 
-// Walks the user through setting up or getting an existing category and route.
+// Walks the user through setting up or getting a route.
 func wizard(db *sql.DB, routeName string) *Route {
 	var (
 		c *Category
@@ -74,7 +78,7 @@ func wizard(db *sql.DB, routeName string) *Route {
 	routes := getRoutesByCategory(db, c.ID)
 
 	if len(routes) == 0 || !promptYN("Use existing route?") {
-		r = setupNewRoute(db, c.ID)
+		r = setupNewRoute(db, c)
 	} else {
 		fmt.Println("Choose an existing route: ")
 		for i, route := range routes {
