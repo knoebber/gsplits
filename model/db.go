@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"database/sql"
@@ -54,8 +54,8 @@ func createTables(db *sql.DB) {
 
 }
 
-// Opens or creates a sqlite3 database.
-func initDB() *sql.DB {
+// InitDB opens or creates a sqlite3 database.
+func InitDB() *sql.DB {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
@@ -81,7 +81,7 @@ func rollback(tx *sql.Tx, err error) {
 	panic(err)
 }
 
-func lastId(res sql.Result, tx *sql.Tx) int64 {
+func lastID(res sql.Result, tx *sql.Tx) int64 {
 	id, err := res.LastInsertId()
 	if err != nil {
 		rollback(tx, err)

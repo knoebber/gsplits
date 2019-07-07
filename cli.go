@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"gsplits/model"
 	"os"
 	"strconv"
 	"strings"
@@ -12,17 +13,19 @@ import (
 
 const divider = "=========="
 
-func setupNewCategory(db *sql.DB) *Category {
+func setupNewCategory(db *sql.DB) *model.Category {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Printf("New category name: ")
 	scanner.Scan()
-	return createCategory(db, &Category{Name: scanner.Text()})
+	c := &model.Category{Name: scanner.Text()}
+	c.Save(db)
+	return c
 }
 
-func setupNewRoute(db *sql.DB, c *Category) *Route {
+func setupNewRoute(db *sql.DB, c *model.Category) *model.Route {
 	var (
-		splitNames   []*SplitName
-		splitName    *SplitName
+		splitNames   []*model.SplitName
+		splitName    *model.SplitName
 		newRouteName string
 	)
 
@@ -41,7 +44,7 @@ func setupNewRoute(db *sql.DB, c *Category) *Route {
 	for {
 		fmt.Printf("%d.) ", i+1)
 		scanner.Scan()
-		splitName = &SplitName{Name: scanner.Text()}
+		splitName = &model.SplitName{Name: scanner.Text()}
 		i++
 		if splitName.Name == "" {
 			break
@@ -49,23 +52,24 @@ func setupNewRoute(db *sql.DB, c *Category) *Route {
 		splitNames = append(splitNames, splitName)
 	}
 
-	r := &Route{
+	r := &model.Route{
 		Name:     newRouteName,
 		Splits:   splitNames,
 		Category: c,
 	}
 	exitWhenNo("Save?")
-	return createRoute(db, r)
+	r.Save(db)
+	return r
 }
 
 // Walks the user through setting up or getting a route.
-func wizard(db *sql.DB, routeName string) *Route {
+func wizard(db *sql.DB, routeName string) *model.Route {
 	var (
-		c *Category
-		r *Route
+		c *model.Category
+		r *model.Route
 	)
 
-	categories := getCategories(db)
+	categories := model.GetCategories(db)
 	if len(categories) == 0 || !promptYN("Use existing category?") {
 		c = setupNewCategory(db)
 	} else {
@@ -76,7 +80,7 @@ func wizard(db *sql.DB, routeName string) *Route {
 		c = &categories[promptListSelect(len(categories))]
 	}
 
-	routes := getRoutesByCategory(db, c.ID)
+	routes := model.GetRoutesByCategory(db, c.ID)
 
 	if len(routes) == 0 || !promptYN("Use existing route?") {
 		r = setupNewRoute(db, c)
@@ -85,7 +89,7 @@ func wizard(db *sql.DB, routeName string) *Route {
 		for i, route := range routes {
 			fmt.Printf("(%d) %s\n", i+1, route.Name)
 		}
-		r = getRoute(db, routes[promptListSelect(len(routes))].ID, "")
+		r = model.GetRoute(db, routes[promptListSelect(len(routes))].ID, "")
 		if r == nil {
 			panic("route is nil")
 		}
@@ -93,7 +97,7 @@ func wizard(db *sql.DB, routeName string) *Route {
 	return r
 }
 
-func printRouteSplits(r *Route) {
+func printRouteSplits(r *model.Route) {
 	fmt.Printf("\n%s %s %s\n", divider, r.Name, divider)
 	for i, s := range r.Splits {
 		fmt.Printf("%d). %s\n", i+1, s.Name)
@@ -101,7 +105,7 @@ func printRouteSplits(r *Route) {
 }
 
 // TODO doesn't work with newly created route.
-func printRouteInfo(r *Route) {
+func printRouteInfo(r *model.Route) {
 	printRouteSplits(r)
 	fmt.Printf("%s Best: %s\n", r.Category.Name, formatTimeElapsed(time.Duration(r.Category.Best*1e6)))
 	if r.Category.Best < r.Best {

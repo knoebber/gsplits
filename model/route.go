@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"database/sql"
@@ -27,8 +27,8 @@ type SplitName struct {
 	Route          *Route
 }
 
-// Creates a new route.
-func (r *Route) createRoute(db *sql.DB) {
+// Save inserts the run into the database.
+func (r *Route) Save(db *sql.DB) {
 	if r == nil {
 		panic(errors.New("route is nil"))
 	}
@@ -47,7 +47,7 @@ func (r *Route) createRoute(db *sql.DB) {
 		panic(err)
 	}
 
-	r.ID = lastId(res, tx)
+	r.ID = lastID(res, tx)
 
 	for i, sn := range r.Splits {
 		res, err = tx.Exec("INSERT INTO split_name(route_id, position, name) VALUES (?, ?, ?)",
@@ -57,7 +57,7 @@ func (r *Route) createRoute(db *sql.DB) {
 			panic(err)
 		}
 
-		sn.ID = lastId(res, tx)
+		sn.ID = lastID(res, tx)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -65,9 +65,9 @@ func (r *Route) createRoute(db *sql.DB) {
 	}
 }
 
-// Gets all route names and their ids for a category.
+// GetRoutesByCategory returns a list of all route names and their ids for a category.
 // This does not populate the rest of the route struct.
-func getRoutesByCategory(db *sql.DB, categoryID int64) []Route {
+func GetRoutesByCategory(db *sql.DB, categoryID int64) []Route {
 	var (
 		result []Route
 		r      Route
@@ -95,9 +95,9 @@ func getRoutesByCategory(db *sql.DB, categoryID int64) []Route {
 	return result
 }
 
-// Get a route and category by the route name or the id
+// GetRoute gets a route by its primary key or its name.
 // Returns nil if the route isn't found.
-func getRoute(db *sql.DB, id int64, name string) *Route {
+func GetRoute(db *sql.DB, id int64, name string) *Route {
 	var (
 		where string
 		err   error

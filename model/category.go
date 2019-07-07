@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"database/sql"
@@ -14,8 +14,10 @@ type Category struct {
 	TotalRuns int64
 }
 
-// Creates a new category.
-func createCategory(db *sql.DB, c *Category) *Category {
+// Save inserts the category into the database.
+func (c *Category) Save(db *sql.DB) {
+	var err error
+
 	if c.Name == "" {
 		panic(errors.New("failed to save category, name is not set"))
 	}
@@ -24,16 +26,14 @@ func createCategory(db *sql.DB, c *Category) *Category {
 		panic(err)
 	}
 
-	categoryID, err := res.LastInsertId()
+	c.ID, err = res.LastInsertId()
 	if err != nil {
 		panic(err)
 	}
-	c.ID = categoryID
-	return c
 }
 
-// Gets all saved categories.
-func getCategories(db *sql.DB) []Category {
+// GetCategories returns a slice of all saved categories.
+func GetCategories(db *sql.DB) []Category {
 	var (
 		result []Category
 		c      Category

@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"gsplits/model"
 	"os"
 	"strconv"
 	"strings"
@@ -62,16 +63,16 @@ func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) st
 }
 
 func main() {
-	db := initDB()
+	db := model.InitDB()
 	defer db.Close()
 
 	route := strings.TrimSpace(strings.Join(os.Args[1:], " "))
 
-	var r *Route
+	var r *model.Route
 
 	// Try to get the route from the database by the passed in name.
 	// TODO get category as well.
-	r = getRoute(db, 0, route)
+	r = model.GetRoute(db, 0, route)
 	if r == nil {
 		if route != "" {
 			fmt.Printf("route '%s' not found\n", route)
@@ -86,7 +87,7 @@ func main() {
 	startSplits(r, db)
 }
 
-func startSplits(r *Route, db *sql.DB) {
+func startSplits(r *model.Route, db *sql.DB) {
 	var (
 		totalElapsed   time.Duration
 		splitElapsed   time.Duration
@@ -106,9 +107,9 @@ func startSplits(r *Route, db *sql.DB) {
 	lastSplitEnd := time.Now()
 
 	// The database model for saving the run.
-	run := &Run{
+	run := &model.Run{
 		Route:  r,
-		Splits: make([]Split, len(r.Splits)),
+		Splits: make([]*model.Split, len(r.Splits)),
 	}
 
 	routeBestTotal = r.Splits[0].RouteBestSplit
@@ -131,7 +132,7 @@ func startSplits(r *Route, db *sql.DB) {
 			fmt.Print(statusLine)
 			fmt.Printf("%s\n", divider)
 
-			run.Splits[i] = Split{
+			run.Splits[i] = &model.Split{
 				SplitNameID:  r.Splits[i].ID,
 				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
 			}
@@ -147,7 +148,7 @@ func startSplits(r *Route, db *sql.DB) {
 
 				if promptYN("Save?") {
 					run.Milliseconds = totalElapsed.Nanoseconds() / 1e6
-					saveRun(db, run)
+					run.Save(db)
 				}
 				os.Exit(0)
 			}
