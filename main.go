@@ -36,12 +36,29 @@ func formatTimeElapsed(d time.Duration) string {
 	if len(seconds) == 1 {
 		seconds = "0" + seconds
 	}
+	hs := strconv.Itoa(int(d.Nanoseconds()/1e7) % 100)
+	if len(hs) == 1 {
+		hs = "0" + hs
+	}
 
 	return fmt.Sprintf("%s%s%s.%d",
 		nToTime(int(d.Hours())%24),
 		nToTime(int(d.Minutes())%60),
 		seconds,
-		int(d.Nanoseconds()/1e7)%100) // Show hundreths of a second.
+		hs,
+	)
+}
+
+// routeBestTotal is in milleseconds.
+func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) string {
+	diff := int64(currentRunTotal) - (routeBestTotal * 1e6)
+	if diff == 0 {
+		return strconv.Itoa(0)
+	} else if diff < 0 {
+		return "-" + formatTimeElapsed(time.Duration(diff*-1))
+	} else {
+		return "+" + formatTimeElapsed(time.Duration(diff))
+	}
 }
 
 func main() {
@@ -63,7 +80,7 @@ func main() {
 		r = wizard(db, route)
 	}
 
-	printRouteSplits(r)
+	printRouteInfo(r)
 	exitWhenNo("Start? ")
 	fmt.Printf("\n%s %s %s\n\n", divider, r.Name, divider)
 	startSplits(r, db)
@@ -71,11 +88,11 @@ func main() {
 
 func startSplits(r *Route, db *sql.DB) {
 	var (
-		totalElapsed time.Duration
-		splitElapsed time.Duration
-		total        string
-		split        string
-		i            int
+		totalElapsed   time.Duration
+		splitElapsed   time.Duration
+		statusLine     string
+		routeBestTotal int64
+		i              int
 	)
 
 	if len(r.Splits) == 0 {
@@ -94,19 +111,26 @@ func startSplits(r *Route, db *sql.DB) {
 		Splits: make([]Split, len(r.Splits)),
 	}
 
+	routeBestTotal = r.Splits[0].RouteBestSplit
 	for {
-		total = formatTimeElapsed(totalElapsed)
-		split = formatTimeElapsed(splitElapsed)
+
+		statusLine = fmt.Sprintf("%s => %s Total: %s\tSplit: %s\tGold: %s",
+			r.Splits[i].Name,
+			formatTimePlusMinus(totalElapsed, routeBestTotal),
+			formatTimeElapsed(totalElapsed),
+			formatTimeElapsed(splitElapsed),
+			formatTimeElapsed(time.Duration(r.Splits[i].GoldSplit)),
+		)
 		// Proccess milliseconds and enter presses async.
 		select {
 		case <-time.After(time.Millisecond):
 			totalElapsed = time.Since(start)
 			splitElapsed = time.Since(lastSplitEnd)
-			fmt.Printf("TOTAL: %s\t\tSPLIT: %s\r", total, split)
+			fmt.Print(statusLine + "\r")
 		case <-enter:
-			fmt.Println(r.Splits[i].Name)
-			fmt.Printf("TOTAL: %s\t\tSPLIT: %s\n", total, split)
+			fmt.Print(statusLine)
 			fmt.Printf("%s\n", divider)
+
 			run.Splits[i] = Split{
 				SplitNameID:  r.Splits[i].ID,
 				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
@@ -118,7 +142,7 @@ func startSplits(r *Route, db *sql.DB) {
 
 			if i == len(r.Splits) {
 				fmt.Printf("\n%s\n", divider)
-				fmt.Printf("FINISH! %s\n", total)
+				fmt.Printf("FINISH! %s\n", formatTimeElapsed(totalElapsed))
 				fmt.Printf("%s\n", divider)
 
 				if promptYN("Save?") {
@@ -127,6 +151,7 @@ func startSplits(r *Route, db *sql.DB) {
 				}
 				os.Exit(0)
 			}
+			routeBestTotal += r.Splits[i].RouteBestSplit
 			go waitForEnter(enter)
 		}
 	}
