@@ -8,7 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const divider = "=========="
@@ -95,23 +94,6 @@ func wizard(db *sql.DB, routeName string) *model.Route {
 		}
 	}
 	return r
-}
-
-func printRouteSplits(r *model.Route) {
-	fmt.Printf("\n%s %s %s\n", divider, r.Name, divider)
-	for i, s := range r.Splits {
-		fmt.Printf("%d). %s\n", i+1, s.Name)
-	}
-}
-
-// TODO doesn't work with newly created route.
-func printRouteInfo(r *model.Route) {
-	printRouteSplits(r)
-	fmt.Printf("%s Best: %s\n", r.Category.Name, formatTimeElapsed(time.Duration(r.Category.Best*1e6)))
-	if r.Category.Best < r.Best {
-		fmt.Printf("%s Best: %s\n", r.Name, formatTimeElapsed(time.Duration(r.Best*1e6)))
-	}
-	fmt.Printf("Sum of gold splits: %s\n", formatTimeElapsed(time.Duration(r.SumOfGold*1e6)))
 }
 
 // Presents a prompt to the user to pick an option number.

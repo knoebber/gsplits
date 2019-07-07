@@ -10,7 +10,7 @@ import (
 type Category struct {
 	ID        int64
 	Name      string
-	Best      int64
+	Best      *int64
 	TotalRuns int64
 }
 

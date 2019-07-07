@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// Start showing time save within this many nano seconds
+// const plusMinusThreshold = (5 * 1e9) * -1
+
 // On enter press erase the line above and send true to the channel.
 // This lets the main loop know to split.
 func waitForEnter(enter chan bool) {
@@ -37,22 +40,54 @@ func formatTimeElapsed(d time.Duration) string {
 	if len(seconds) == 1 {
 		seconds = "0" + seconds
 	}
-	hs := strconv.Itoa(int(d.Nanoseconds()/1e7) % 100)
-	if len(hs) == 1 {
-		hs = "0" + hs
+	hundreths := strconv.Itoa(int(d.Nanoseconds()/1e7) % 100)
+	if len(hundreths) == 1 {
+		hundreths = "0" + hundreths
 	}
 
-	return fmt.Sprintf("%s%s%s.%d",
+	return fmt.Sprintf("%s%s%s.%s",
 		nToTime(int(d.Hours())%24),
 		nToTime(int(d.Minutes())%60),
 		seconds,
-		hs,
+		hundreths,
 	)
+}
+
+func printSplits(r *model.Route) {
+	fmt.Printf("\n****** %s ******\n", r.Name)
+	for i, s := range r.Splits {
+		fmt.Printf("%d). %s\n", i+1, s.Name)
+	}
+}
+
+func printInfo(r *model.Route) {
+	printSplits(r)
+	if r.Category.Best != nil {
+		fmt.Printf("%s Best: %s\n",
+			r.Category.Name,
+			formatTimeElapsed(time.Duration(*r.Category.Best*1e6)),
+		)
+		if r.Best != nil && *r.Category.Best < *r.Best {
+			fmt.Printf("%s Best: %s\n",
+				r.Name,
+				formatTimeElapsed(time.Duration(*r.Best*1e6)),
+			)
+		}
+	}
+	if r.SumOfGold != nil {
+		fmt.Printf("Sum of gold splits: %s\n",
+			formatTimeElapsed(time.Duration(*r.SumOfGold*1e6)),
+		)
+	}
 }
 
 // routeBestTotal is in milleseconds.
 func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) string {
 	diff := int64(currentRunTotal) - (routeBestTotal * 1e6)
+	// if diff < plusMinusThreshold {
+	//	return ""
+	// }
+
 	if diff == 0 {
 		return strconv.Itoa(0)
 	} else if diff < 0 {
@@ -81,7 +116,7 @@ func main() {
 		r = wizard(db, route)
 	}
 
-	printRouteInfo(r)
+	printInfo(r)
 	exitWhenNo("Start? ")
 	fmt.Printf("\n%s %s %s\n\n", divider, r.Name, divider)
 	startSplits(r, db)
@@ -92,6 +127,8 @@ func startSplits(r *model.Route, db *sql.DB) {
 		totalElapsed   time.Duration
 		splitElapsed   time.Duration
 		statusLine     string
+		goldSplit      string
+		timePlusMinus  string
 		routeBestTotal int64
 		i              int
 	)
@@ -112,26 +149,35 @@ func startSplits(r *model.Route, db *sql.DB) {
 		Splits: make([]*model.Split, len(r.Splits)),
 	}
 
-	routeBestTotal = r.Splits[0].RouteBestSplit
+	if r.Splits[0].RouteBestSplit != nil {
+		routeBestTotal = *r.Splits[0].RouteBestSplit
+	}
 	for {
-
-		statusLine = fmt.Sprintf("%s => %s Total: %s\tSplit: %s\tGold: %s",
+		if r.Splits[i].GoldSplit != nil {
+			goldSplit = formatTimeElapsed(time.Duration(*r.Splits[i].GoldSplit * 1e6))
+		} else {
+			goldSplit = "N/A"
+		}
+		if routeBestTotal > 0 {
+			timePlusMinus = formatTimePlusMinus(totalElapsed, routeBestTotal)
+		} else {
+			timePlusMinus = ""
+		}
+		statusLine = fmt.Sprintf("** %s **\t%s\t%s\t(%s) ||| %s",
 			r.Splits[i].Name,
-			formatTimePlusMinus(totalElapsed, routeBestTotal),
+			timePlusMinus,
 			formatTimeElapsed(totalElapsed),
 			formatTimeElapsed(splitElapsed),
-			formatTimeElapsed(time.Duration(r.Splits[i].GoldSplit)),
+			goldSplit,
 		)
 		// Proccess milliseconds and enter presses async.
 		select {
 		case <-time.After(time.Millisecond):
 			totalElapsed = time.Since(start)
 			splitElapsed = time.Since(lastSplitEnd)
-			fmt.Print(statusLine + "\r")
+			fmt.Print(statusLine + "\r") // Carriage return to stay on same line.
 		case <-enter:
-			fmt.Print(statusLine)
-			fmt.Printf("%s\n", divider)
-
+			fmt.Print(statusLine + "\n")
 			run.Splits[i] = &model.Split{
 				SplitNameID:  r.Splits[i].ID,
 				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
@@ -152,7 +198,9 @@ func startSplits(r *model.Route, db *sql.DB) {
 				}
 				os.Exit(0)
 			}
-			routeBestTotal += r.Splits[i].RouteBestSplit
+			if r.Splits[0].RouteBestSplit != nil {
+				routeBestTotal += *r.Splits[i].RouteBestSplit
+			}
 			go waitForEnter(enter)
 		}
 	}
