@@ -59,6 +59,9 @@ func (r *Route) Save(db *sql.DB) {
 		}
 
 		sn.ID = lastID(res, tx)
+		if len(sn.Name) > r.MaxNameWidth {
+			r.MaxNameWidth = len(sn.Name)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

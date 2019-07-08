@@ -11,7 +11,7 @@ import (
 )
 
 // Start showing time save within this many nano seconds
-// const plusMinusThreshold = (5 * 1e9) * -1
+const plusMinusThreshold = (10 * 1e9) * -1
 
 // The amount of padding characters to put around times.
 const timePadding = 13
@@ -95,9 +95,9 @@ func printInfo(r *model.Route) {
 // routeBestTotal is in milleseconds.
 func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) string {
 	diff := int64(currentRunTotal) - (routeBestTotal * 1e6)
-	// if diff < plusMinusThreshold {
-	//	return ""
-	// }
+	if diff < plusMinusThreshold || routeBestTotal < 1 {
+		return strings.Repeat(" ", timePadding)
+	}
 
 	if diff == 0 {
 		return strconv.Itoa(0)
@@ -169,11 +169,7 @@ func startSplits(r *model.Route, db *sql.DB) {
 		} else {
 			goldSplit = "N/A"
 		}
-		if routeBestTotal > 0 {
-			timePlusMinus = formatTimePlusMinus(totalElapsed, routeBestTotal)
-		} else {
-			timePlusMinus = ""
-		}
+		timePlusMinus = formatTimePlusMinus(totalElapsed, routeBestTotal)
 		statusLine = fmt.Sprintf("== %-*s == %s %-*s||| Split => %-*s Gold => %-*s",
 			r.MaxNameWidth,
 			r.Splits[i].Name,
@@ -192,16 +188,14 @@ func startSplits(r *model.Route, db *sql.DB) {
 			splitElapsed = time.Since(lastSplitEnd)
 			fmt.Print(statusLine + "\r") // Carriage return to stay on same line.
 		case <-enter:
-			fmt.Print(statusLine + "\n")
 			run.Splits[i] = &model.Split{
 				SplitNameID:  r.Splits[i].ID,
 				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
 			}
 
 			lastSplitEnd = time.Now()
-
+			fmt.Print(statusLine + "\n")
 			i++
-
 			if i == len(r.Splits) {
 				fmt.Printf("\n%s\n", divider)
 				fmt.Printf("FINISH! %s\n", formatTimeElapsed(totalElapsed))
