@@ -16,6 +16,12 @@ import (
 // The amount of padding characters to put around times.
 const timePadding = 13
 
+// Colors
+const (
+	aheadColor  = "\033[1;32m%s\033[0m"
+	behindColor = "\033[1;31m%s\033[0m"
+)
+
 // On enter press erase the line above and send true to the channel.
 // This lets the main loop know to split.
 func waitForEnter(enter chan bool) {
@@ -96,9 +102,9 @@ func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) st
 	if diff == 0 {
 		return strconv.Itoa(0)
 	} else if diff < 0 {
-		return "-" + formatTimeElapsed(time.Duration(diff*-1))
+		return fmt.Sprintf(aheadColor, "-"+formatTimeElapsed(time.Duration(diff*-1)))
 	} else {
-		return "+" + formatTimeElapsed(time.Duration(diff))
+		return fmt.Sprintf(behindColor, "+"+formatTimeElapsed(time.Duration(diff)))
 	}
 }
 
@@ -156,6 +162,7 @@ func startSplits(r *model.Route, db *sql.DB) {
 	if r.Splits[0].RouteBestSplit != nil {
 		routeBestTotal = *r.Splits[0].RouteBestSplit
 	}
+
 	for {
 		if r.Splits[i].GoldSplit != nil {
 			goldSplit = formatTimeElapsed(time.Duration(*r.Splits[i].GoldSplit * 1e6))
