@@ -99,7 +99,6 @@ func GetRoutesByCategory(db *sql.DB, categoryID int64) []Route {
 // GetRoute gets a route by its primary key or its name.
 // Returns nil if the route isn't found.
 func GetRoute(db *sql.DB, id int64, name string) *Route {
-	fmt.Println("Getting route!")
 	var (
 		where string
 		err   error

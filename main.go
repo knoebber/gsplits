@@ -13,6 +13,9 @@ import (
 // Start showing time save within this many nano seconds
 // const plusMinusThreshold = (5 * 1e9) * -1
 
+// The amount of padding characters to put around times.
+const timePadding = 13
+
 // On enter press erase the line above and send true to the channel.
 // This lets the main loop know to split.
 func waitForEnter(enter chan bool) {
@@ -54,7 +57,7 @@ func formatTimeElapsed(d time.Duration) string {
 }
 
 func printSplits(r *model.Route) {
-	fmt.Printf("\n****** %s ******\n", r.Name)
+	fmt.Printf("\n%s %s %s\n", divider, r.Name, divider)
 	for i, s := range r.Splits {
 		fmt.Printf("%d). %s\n", i+1, s.Name)
 	}
@@ -62,6 +65,7 @@ func printSplits(r *model.Route) {
 
 func printInfo(r *model.Route) {
 	printSplits(r)
+	fmt.Print("\n\n")
 	if r.Category.Best != nil {
 		fmt.Printf("%s Best: %s\n",
 			r.Category.Name,
@@ -79,6 +83,7 @@ func printInfo(r *model.Route) {
 			formatTimeElapsed(time.Duration(*r.SumOfGold*1e6)),
 		)
 	}
+	fmt.Print("\n\n")
 }
 
 // routeBestTotal is in milleseconds.
@@ -118,7 +123,6 @@ func main() {
 
 	printInfo(r)
 	exitWhenNo("Start? ")
-	fmt.Printf("\n%s %s %s\n\n", divider, r.Name, divider)
 	startSplits(r, db)
 }
 
@@ -163,11 +167,16 @@ func startSplits(r *model.Route, db *sql.DB) {
 		} else {
 			timePlusMinus = ""
 		}
-		statusLine = fmt.Sprintf("** %s **\t%s\t%s\t(%s) ||| %s",
+		statusLine = fmt.Sprintf("== %-*s == %-*s\t%-*s\t||| Split => %-*s Gold => %-*s",
+			r.MaxNameWidth,
 			r.Splits[i].Name,
+			timePadding,
 			timePlusMinus,
+			timePadding,
 			formatTimeElapsed(totalElapsed),
+			timePadding,
 			formatTimeElapsed(splitElapsed),
+			timePadding,
 			goldSplit,
 		)
 		// Proccess milliseconds and enter presses async.
