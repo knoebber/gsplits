@@ -16,10 +16,10 @@ import (
 // The amount of padding characters to put around times.
 const timePadding = 13
 
-// Colors
+// formatter for adding a timestamp with a color and a padding.
 const (
-	aheadColor  = "\033[1;32m%s\033[0m"
-	behindColor = "\033[1;31m%s\033[0m"
+	aheadColor  = "\033[1;32m%-*s\033[0m"
+	behindColor = "\033[1;31m%-*s\033[0m"
 )
 
 // On enter press erase the line above and send true to the channel.
@@ -102,9 +102,9 @@ func formatTimePlusMinus(currentRunTotal time.Duration, routeBestTotal int64) st
 	if diff == 0 {
 		return strconv.Itoa(0)
 	} else if diff < 0 {
-		return fmt.Sprintf(aheadColor, "-"+formatTimeElapsed(time.Duration(diff*-1)))
+		return fmt.Sprintf(aheadColor, timePadding, "-"+formatTimeElapsed(time.Duration(diff*-1)))
 	} else {
-		return fmt.Sprintf(behindColor, "+"+formatTimeElapsed(time.Duration(diff)))
+		return fmt.Sprintf(behindColor, timePadding, "+"+formatTimeElapsed(time.Duration(diff)))
 	}
 }
 
@@ -174,10 +174,9 @@ func startSplits(r *model.Route, db *sql.DB) {
 		} else {
 			timePlusMinus = ""
 		}
-		statusLine = fmt.Sprintf("== %-*s == %-*s\t%-*s\t||| Split => %-*s Gold => %-*s",
+		statusLine = fmt.Sprintf("== %-*s == %s %-*s||| Split => %-*s Gold => %-*s",
 			r.MaxNameWidth,
 			r.Splits[i].Name,
-			timePadding,
 			timePlusMinus,
 			timePadding,
 			formatTimeElapsed(totalElapsed),
