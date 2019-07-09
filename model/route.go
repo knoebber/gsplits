@@ -24,7 +24,7 @@ type SplitName struct {
 	Position       int64
 	Name           string
 	RouteBestSplit *int64 // How fast the split was in the best run of the route.
-	GoldSplit      *int64 // The fastest the split has been completed.
+	Gold           *int64 // The fastest the split has been completed.
 	Route          *Route
 }
 
@@ -193,7 +193,7 @@ ORDER BY r.id, sn.position;
 		if err := rows.Scan(
 			&sn.ID,
 			&sn.Name,
-			&sn.GoldSplit,
+			&sn.Gold,
 			&sn.RouteBestSplit,
 			&r.ID,
 			&r.Name,
@@ -206,11 +206,11 @@ ORDER BY r.id, sn.position;
 			panic(err)
 		}
 
-		if sn.GoldSplit != nil {
+		if sn.Gold != nil {
 			if r.SumOfGold == nil {
 				r.SumOfGold = &zero
 			}
-			*r.SumOfGold += *sn.GoldSplit
+			*r.SumOfGold += *sn.Gold
 		}
 		r.Splits = append(r.Splits, sn)
 		if len(sn.Name) > r.MaxNameWidth {
