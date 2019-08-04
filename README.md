@@ -11,4 +11,6 @@ route, you can enter the route directly by calling `gsplits <Name of Route>`
 (Case sensitive, spaces are allowed.)
 Once a run is started, press enter to go the next split.
 
+## Example run output
 
+![example_run](https://github.com/knoebber/gsplits/blob/master/example_run.png)
