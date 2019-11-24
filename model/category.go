@@ -42,11 +42,11 @@ func GetCategories(db *sql.DB) []Category {
 	query := `
         SELECT c.id, 
                c.name, 
-               MIN(run.milliseconds) AS pb,
+               MIN(ifnull(run.milliseconds,0)) AS pb,
                COUNT(*) AS total_runs
         FROM category AS C
         JOIN route AS r ON r.category_id = c.id
-        JOIN run ON run.route_id = r.id
+        LEFT JOIN run ON run.route_id = r.id
         GROUP BY c.id
         ORDER BY c.id`
 
