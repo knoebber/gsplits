@@ -35,7 +35,7 @@ func (r *Route) Save(db *sql.DB) {
 	}
 
 	if len(r.Splits) == 0 || r.Category.ID == 0 || r.Name == "" {
-		panic(fmt.Errorf("route has empty values: \n%+v\n", *r))
+		panic(fmt.Errorf("route has empty values: \n%+v", *r))
 	}
 
 	tx, err := db.Begin()
