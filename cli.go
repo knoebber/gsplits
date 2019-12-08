@@ -2,29 +2,26 @@ package main
 
 import (
 	"bufio"
-	"database/sql"
 	"fmt"
-	"gsplits/model"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/knoebber/gsplits/category"
+	"github.com/knoebber/gsplits/route"
 )
 
 const divider = "=========="
 
-func setupNewCategory(db *sql.DB) *model.Category {
+func getCategoryName() string {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Printf("New category name: ")
 	scanner.Scan()
-	c := &model.Category{Name: scanner.Text()}
-	c.Save(db)
-	return c
+	return scanner.Text()
 }
 
-func setupNewRoute(db *sql.DB, c *model.Category) *model.Route {
+func setupNewRoute(categoryID int64) (routeID int64, err error) {
 	var (
-		splitNames   []*model.SplitName
-		splitName    *model.SplitName
 		newRouteName string
 	)
 
@@ -40,60 +37,67 @@ func setupNewRoute(db *sql.DB, c *model.Category) *model.Route {
 	fmt.Println("Input the names of each split")
 	fmt.Println("Push enter without input to finish")
 	fmt.Println("")
+
+	splitNames := []string{}
 	for {
 		fmt.Printf("%d.) ", i+1)
 		scanner.Scan()
-		splitName = &model.SplitName{Name: scanner.Text()}
+		name := scanner.Text()
 		i++
-		if splitName.Name == "" {
+		if name == "" {
 			break
 		}
-		splitNames = append(splitNames, splitName)
+		splitNames = append(splitNames, name)
 	}
 
-	r := &model.Route{
-		Name:     newRouteName,
-		Splits:   splitNames,
-		Category: c,
-	}
 	exitWhenNo("Save?")
-	r.Save(db)
-	return r
+	return saveRoute(categoryID, newRouteName, splitNames)
 }
 
 // Walks the user through setting up or getting a route.
-func wizard(db *sql.DB, routeName string) *model.Route {
+func wizard(routeName string) (routeID int64, err error) {
 	var (
-		c *model.Category
-		r *model.Route
+		categories []category.Name
+		routes     []route.Name
+		categoryID int64
 	)
 
-	categories := model.GetCategories(db)
+	categories, err = category.All()
+	if err != nil {
+		return
+	}
+
 	if len(categories) == 0 || !promptYN("Use existing category?") {
-		c = setupNewCategory(db)
+		categoryID, err = saveCategory(getCategoryName())
+		if err != nil {
+			return
+		}
 	} else {
 		fmt.Println("Choose a category")
 		for i, category := range categories {
 			fmt.Printf("(%d) %s\n", i+1, category.Name)
 		}
-		c = &categories[promptListSelect(len(categories))]
+		categoryID = categories[promptListSelect(len(categories))].ID
 	}
 
-	routes := model.GetRoutesByCategory(db, c.ID)
+	routes, err = route.GetByCategory(categoryID)
+	if err != nil {
+		return
+	}
 
 	if len(routes) == 0 || !promptYN("Use existing route?") {
-		r = setupNewRoute(db, c)
+		routeID, err = setupNewRoute(categoryID)
+		if err != nil {
+			return
+		}
 	} else {
 		fmt.Println("Choose a route")
 		for i, route := range routes {
 			fmt.Printf("(%d) %s\n", i+1, route.Name)
 		}
-		r = model.GetRoute(db, routes[promptListSelect(len(routes))].ID, "")
-		if r == nil {
-			panic("route is nil")
-		}
+		routeID = routes[promptListSelect(len(routes))].ID
 	}
-	return r
+	return
 }
 
 // Presents a prompt to the user to pick an option number.

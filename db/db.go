@@ -1,20 +1,25 @@
-package model
+package db
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	// Driver for sql
 	_ "github.com/mattn/go-sqlite3"
+	"gopkg.in/go-playground/validator.v9"
 )
+
+// Connection is a sql connection.
+var Connection *sql.DB
+
+var validate *validator.Validate
 
 // The name of the sqlite3 db file.
 // Created as a hidden file in the home directory: ~/.gsplits
-const dbName = "gsplits"
+const dbName = "gsplits-test"
 
 // Creates the required tables if they doesn't exist
-func createTables(db *sql.DB) {
+func createTables() error {
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS category(
                         id   INTEGER PRIMARY KEY,
@@ -46,45 +51,52 @@ func createTables(db *sql.DB) {
 	}
 
 	for _, table := range tables {
-		_, err := db.Exec(table)
+		_, err := Connection.Exec(table)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("failed to create tables: %w", err)
 		}
 	}
-
+	return nil
 }
 
-// InitDB opens or creates a sqlite3 database.
-func InitDB() *sql.DB {
-	home, err := os.UserHomeDir()
+// Start opens a connection a sqlite3 database.
+// It will create a new database if the db file does not exist.
+func Start() error {
+	var (
+		home string
+		err  error
+	)
+
+	home, err = os.UserHomeDir()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	db, err := sql.Open("sqlite3", fmt.Sprintf("%s/.%s.db", home, dbName))
+	Connection, err = sql.Open("sqlite3", fmt.Sprintf("%s/.%s.db", home, dbName))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to open sqlite datebase: %w", err)
 	}
-	if db == nil {
-		panic("db is nil")
-	}
-	createTables(db)
-	return db
+
+	validate = validator.New()
+	return createTables()
 }
 
-// Rolls back a database transaction and panics.
-func rollback(tx *sql.Tx, err error) {
-	fmt.Println("Rolling back transaction")
-	if err := tx.Rollback(); err != nil {
-		panic(errors.New("failed to rollback"))
-	}
-	panic(err)
+// Close closes the connection.
+func Close() {
+	Connection.Close()
 }
 
-func lastID(res sql.Result, tx *sql.Tx) int64 {
-	id, err := res.LastInsertId()
-	if err != nil {
-		rollback(tx, err)
+// Validate validates a struct.
+// Should be used to check values before insertion.
+func Validate(s interface{}) error {
+	return validate.Struct(s)
+}
+
+// Rollback rolls back a database transaction.
+// It always returns an error.
+func Rollback(tx *sql.Tx, err error) error {
+	if rbError := tx.Rollback(); rbError != nil {
+		return fmt.Errorf("failed to rollback database transaction: %w", rbError)
 	}
-	return id
+	return fmt.Errorf("rolled back from error: %w", err)
 }

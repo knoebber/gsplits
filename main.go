@@ -1,13 +1,16 @@
 package main
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
-	"gsplits/model"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/knoebber/gsplits/db"
+	"github.com/knoebber/gsplits/route"
+	"github.com/knoebber/gsplits/split"
 )
 
 // Start showing time save within this many nano seconds
@@ -62,39 +65,36 @@ func formatTimeElapsed(d time.Duration) string {
 	)
 }
 
-func printSplits(r *model.Route) {
-	fmt.Printf("\n%s %s %s\n", divider, r.Name, divider)
-	for i, s := range r.Splits {
-		fmt.Printf("%d). %s\n", i+1, s.Name)
+func printSplits(routeName string, splitNames []split.Name) {
+	fmt.Printf("\n%s %s %s\n", divider, routeName, divider)
+	for i, ns := range splitNames {
+		fmt.Printf("%d). %s\n", i+1, ns.Name)
 	}
 }
 
-func printInfo(r *model.Route) {
-	printSplits(r)
+func printInfo(d *route.Data) {
+	printSplits(d.RouteName, d.SplitNames)
 	fmt.Print("\n\n")
-	if r.Category.Best != nil {
+	if d.Category.Best != nil {
 		fmt.Printf("%s Best: %s\n",
-			r.Category.Name,
-			formatTimeElapsed(time.Duration(*r.Category.Best*1e6)),
+			d.Category.Name,
+			formatTimeElapsed(*d.Category.Best),
 		)
-		if r.Best != nil && *r.Category.Best < *r.Best {
+		if d.RouteBestTime != nil && *d.Category.Best < *d.RouteBestTime {
 			fmt.Printf("%s Best: %s\n",
-				r.Name,
-				formatTimeElapsed(time.Duration(*r.Best*1e6)),
+				d.RouteName,
+				formatTimeElapsed(*d.RouteBestTime),
 			)
 		}
 	}
-	if r.SumOfGold != nil {
-		fmt.Printf("Sum of gold splits: %s\n",
-			formatTimeElapsed(time.Duration(*r.SumOfGold*1e6)),
-		)
+	if d.SumOfGold != nil {
+		fmt.Printf("Sum of gold splits: %s\n", formatTimeElapsed(*d.SumOfGold))
 	}
 	fmt.Print("\n\n")
 }
 
-// routeBestTotal is in milleseconds.
-func formatTimePlusMinus(totalElapsed time.Duration, routeBestTotal int64, current bool) string {
-	diff := int64(totalElapsed) - (routeBestTotal * 1e6)
+func formatTimePlusMinus(totalElapsed time.Duration, routeBestTotal time.Duration, current bool) string {
+	diff := totalElapsed - routeBestTotal
 	if (current && diff < plusMinusThreshold) || routeBestTotal < 1 {
 		return strings.Repeat(" ", timePadding)
 	}
@@ -110,8 +110,8 @@ func formatTimePlusMinus(totalElapsed time.Duration, routeBestTotal int64, curre
 
 func printStatusLine(
 	maxNameWidth int,
-	routeBestTotal int64,
 	splitName string,
+	routeBestTotal time.Duration,
 	totalElapsed time.Duration,
 	splitElapsed time.Duration,
 	goldSplit string,
@@ -142,41 +142,65 @@ func printStatusLine(
 	)
 }
 
-func main() {
-	db := model.InitDB()
-	defer db.Close()
-
-	route := strings.TrimSpace(strings.Join(os.Args[1:], " "))
-
-	var r *model.Route
-
-	// Try to get the route from the database by the passed in name.
-	// TODO get category as well.
-	r = model.GetRoute(db, 0, route)
-	if r == nil {
-		if route != "" {
-			fmt.Printf("route '%s' not found\n", route)
-		}
-		// Use the category wizard to either create or get an existing category.
-		r = wizard(db, route)
-	}
-
-	printInfo(r)
-	exitWhenNo("Start? ")
-	startSplits(r, db)
+func exit(err error) {
+	fmt.Println(err)
+	os.Exit(1)
 }
 
-func startSplits(r *model.Route, db *sql.DB) {
+func main() {
+	var (
+		routeID int64
+		err     error
+		d       *route.Data
+	)
+	if err = db.Start(); err != nil {
+		exit(err)
+	}
+
+	defer db.Close()
+
+	routeName := strings.TrimSpace(strings.Join(os.Args[1:], " "))
+
+	// Search for route name in database by the passed in name.
+	if routeName != "" {
+		d, err = route.GetData(0, routeName)
+
+		if err != nil {
+			exit(err)
+		}
+	} else {
+		// Use the category wizard to either create or get an existing category.
+		routeID, err = wizard(routeName)
+		if err != nil {
+			exit(err)
+		}
+
+		d, err = route.GetData(routeID, "")
+		if err != nil {
+			exit(err)
+		}
+	}
+
+	printInfo(d)
+	exitWhenNo("Start? ")
+
+	if err := startSplits(d); err != nil {
+		exit(err)
+	}
+}
+
+func startSplits(d *route.Data) error {
 	var (
 		totalElapsed   time.Duration
 		splitElapsed   time.Duration
+		routeBestTotal time.Duration
 		goldSplit      string
-		routeBestTotal int64
 		i              int
+		splitTimes     []time.Duration
 	)
 
-	if len(r.Splits) == 0 {
-		panic("splits is empty!")
+	if len(d.SplitNames) == 0 {
+		return errors.New("splits is empty")
 	}
 
 	enter := make(chan bool)
@@ -185,19 +209,17 @@ func startSplits(r *model.Route, db *sql.DB) {
 	start := time.Now()
 	lastSplitEnd := time.Now()
 
-	// The database model for saving the run.
-	run := &model.Run{
-		Route:  r,
-		Splits: make([]*model.Split, len(r.Splits)),
-	}
+	splitTimes = make([]time.Duration, len(d.SplitNames))
 
-	if r.Splits[0].RouteBestSplit != nil {
-		routeBestTotal = *r.Splits[0].RouteBestSplit
+	hasSplits := len(d.RouteBests) > 0
+
+	if hasSplits {
+		routeBestTotal = d.RouteBests[0]
 	}
 
 	for {
-		if r.Splits[i].Gold != nil {
-			goldSplit = formatTimeElapsed(time.Duration(*r.Splits[i].Gold * 1e6))
+		if hasSplits {
+			goldSplit = formatTimeElapsed(d.Golds[i])
 		} else {
 			goldSplit = "N/A"
 		}
@@ -208,26 +230,22 @@ func startSplits(r *model.Route, db *sql.DB) {
 			totalElapsed = time.Since(start)
 			splitElapsed = time.Since(lastSplitEnd)
 			printStatusLine(
-				r.MaxNameWidth,
+				d.MaxNameWidth,
+				d.SplitNames[i].Name,
 				routeBestTotal,
-				r.Splits[i].Name,
 				totalElapsed,
 				splitElapsed,
 				goldSplit,
 				true,
 			)
 		case <-enter:
-			run.Splits[i] = &model.Split{
-				SplitNameID:  r.Splits[i].ID,
-				Milliseconds: splitElapsed.Nanoseconds() / 1e6,
-			}
-
+			splitTimes[i] = splitElapsed
 			lastSplitEnd = time.Now()
 
 			printStatusLine(
-				r.MaxNameWidth,
+				d.MaxNameWidth,
+				d.SplitNames[i].Name,
 				routeBestTotal,
-				r.Splits[i].Name,
 				totalElapsed,
 				splitElapsed,
 				goldSplit,
@@ -235,19 +253,19 @@ func startSplits(r *model.Route, db *sql.DB) {
 			)
 
 			i++
-			if i == len(r.Splits) {
+			if i == len(d.SplitNames) {
 				fmt.Printf("\n%s\n", divider)
 				fmt.Printf("FINISH! %s\n", formatTimeElapsed(totalElapsed))
 				fmt.Printf("%s\n", divider)
 
 				if promptYN("Save?") {
-					run.Milliseconds = totalElapsed.Nanoseconds() / 1e6
-					run.Save(db)
+					_, err := saveRun(d.RouteID, splitTimes, totalElapsed)
+					return err
 				}
-				os.Exit(0)
+				return nil
 			}
-			if r.Splits[0].RouteBestSplit != nil {
-				routeBestTotal += *r.Splits[i].RouteBestSplit
+			if hasSplits {
+				routeBestTotal += d.RouteBests[i]
 			}
 			go waitForEnter(enter)
 		}
