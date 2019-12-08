@@ -16,11 +16,31 @@ type saver interface {
 	Save(tx *sql.Tx) (sql.Result, error)
 }
 
+func save(s saver, tx *sql.Tx) (id int64, err error) {
+	var res sql.Result
+
+	res, err = s.Save(tx)
+	if err != nil {
+		return 0, saveError(s, tx, err)
+	}
+
+	id, err = res.LastInsertId()
+	if err != nil {
+		return 0, idError(s, tx, err)
+	}
+	return
+}
+
+func idError(s saver, tx *sql.Tx, err error) error {
+	return fmt.Errorf("failed to get ID from %s: %w", s, db.Rollback(tx, err))
+}
+
+func saveError(s saver, tx *sql.Tx, err error) error {
+	return fmt.Errorf("failed to save %s: %w", s, db.Rollback(tx, err))
+}
+
 func saveCategory(name string) (categoryID int64, err error) {
-	var (
-		tx  *sql.Tx
-		res sql.Result
-	)
+	var tx *sql.Tx
 
 	tx, err = db.Connection.Begin()
 	if err != nil {
@@ -30,15 +50,8 @@ func saveCategory(name string) (categoryID int64, err error) {
 	categoryName := &category.Name{
 		Name: name,
 	}
-
-	res, err = categoryName.Save(tx)
-	if err != nil {
-		return 0, saveError(categoryName, tx, err)
-	}
-
-	categoryID, err = res.LastInsertId()
-	if err != nil {
-		return 0, idError(categoryName, tx, err)
+	if categoryID, err = save(categoryName, tx); err != nil {
+		return
 	}
 
 	err = tx.Commit()
@@ -46,10 +59,7 @@ func saveCategory(name string) (categoryID int64, err error) {
 }
 
 func saveRoute(categoryID int64, name string, splitNames []string) (routeID int64, err error) {
-	var (
-		tx  *sql.Tx
-		res sql.Result
-	)
+	var tx *sql.Tx
 
 	tx, err = db.Connection.Begin()
 	if err != nil {
@@ -60,14 +70,9 @@ func saveRoute(categoryID int64, name string, splitNames []string) (routeID int6
 		Name:       name,
 		CategoryID: categoryID,
 	}
-	res, err = routeName.Save(tx)
+	routeID, err = save(routeName, tx)
 	if err != nil {
-		return 0, saveError(routeName, tx, err)
-	}
-
-	routeID, err = res.LastInsertId()
-	if err != nil {
-		return 0, idError(routeName, tx, err)
+		return
 	}
 
 	sn := &split.Name{
@@ -76,9 +81,10 @@ func saveRoute(categoryID int64, name string, splitNames []string) (routeID int6
 	for i, splitName := range splitNames {
 		sn.Position = i + 1
 		sn.Name = splitName
-		_, err := sn.Save(tx)
+
+		_, err = save(sn, tx)
 		if err != nil {
-			return 0, saveError(sn, tx, err)
+			return
 		}
 	}
 
@@ -89,7 +95,6 @@ func saveRoute(categoryID int64, name string, splitNames []string) (routeID int6
 func saveRun(routeID int64, durations []time.Duration, totalDuration time.Duration) (runID int64, err error) {
 	var (
 		tx         *sql.Tx
-		res        sql.Result
 		splitNames []split.Name
 	)
 
@@ -107,14 +112,10 @@ func saveRun(routeID int64, durations []time.Duration, totalDuration time.Durati
 		Duration: totalDuration,
 		RouteID:  routeID,
 	}
-	res, err = run.Save(tx)
-	if err != nil {
-		return 0, saveError(run, tx, err)
-	}
 
-	runID, err = res.LastInsertId()
+	runID, err = save(run, tx)
 	if err != nil {
-		return 0, idError(run, tx, err)
+		return
 	}
 
 	for i, duration := range durations {
@@ -123,19 +124,11 @@ func saveRun(routeID int64, durations []time.Duration, totalDuration time.Durati
 			Duration: duration,
 			NameID:   splitNames[i].ID,
 		}
-		if _, err := d.Save(tx); err != nil {
-			return 0, saveError(d, tx, err)
+		if _, err = save(d, tx); err != nil {
+			return
 		}
 	}
 
 	err = tx.Commit()
 	return
-}
-
-func idError(s saver, tx *sql.Tx, err error) error {
-	return fmt.Errorf("failed to get ID from %s: %w", s, db.Rollback(tx, err))
-}
-
-func saveError(s saver, tx *sql.Tx, err error) error {
-	return fmt.Errorf("failed to save %s: %w", s, db.Rollback(tx, err))
 }
