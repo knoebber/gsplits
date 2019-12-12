@@ -20,6 +20,14 @@ func getCategoryName() string {
 	return scanner.Text()
 }
 
+func getRouteID(routes []route.Name) int64 {
+	fmt.Println("Choose a route")
+	for i, route := range routes {
+		fmt.Printf("(%d) %s\n", i+1, route.Name)
+	}
+	return routes[promptListSelect(len(routes))].ID
+}
+
 func setupNewRoute(categoryID int64) (routeID int64, err error) {
 	var (
 		newRouteName string
@@ -54,8 +62,23 @@ func setupNewRoute(categoryID int64) (routeID int64, err error) {
 	return saveRoute(categoryID, newRouteName, splitNames)
 }
 
+func findRoute(name string) (routeID int64, err error) {
+	routes, err := route.SearchNames(name)
+	if err != nil {
+		return 0, err
+	}
+	if len(routes) == 1 {
+		return routes[0].ID, nil
+	}
+	if len(routes) == 0 {
+		fmt.Printf("No route names contain %v\n", name)
+		return wizard()
+	}
+	return getRouteID(routes), nil
+}
+
 // Walks the user through setting up or getting a route.
-func wizard(routeName string) (routeID int64, err error) {
+func wizard() (routeID int64, err error) {
 	var (
 		categories []category.Name
 		routes     []route.Name
@@ -91,11 +114,7 @@ func wizard(routeName string) (routeID int64, err error) {
 			return
 		}
 	} else {
-		fmt.Println("Choose a route")
-		for i, route := range routes {
-			fmt.Printf("(%d) %s\n", i+1, route.Name)
-		}
-		routeID = routes[promptListSelect(len(routes))].ID
+		routeID = getRouteID(routes)
 	}
 	return
 }

@@ -21,13 +21,14 @@ type Data struct {
 	SumOfGold     *time.Duration  // The sum of the gold splits.
 	MaxNameWidth  int             // The widest route name. TODO remove after adding lib.
 	SplitNames    []split.Name    // The names of the splits in the category.
+	Comparison    []time.Duration // The total time that the best run had at each split.
 	RouteBests    []time.Duration // The splits from the fastest completion of the route.
 	Golds         []time.Duration // The fastest a split has ever been completed in the route.
 }
 
-// GetData gets a routes data by its primary key or its name.
+// GetData gets a routes data by its primary key.
 // Returns nil if the route isn't found.
-func GetData(routeID int64, name string) (*Data, error) {
+func GetData(routeID int64) (*Data, error) {
 	var (
 		routeBestTime    *int64
 		categoryBestTime *int64
@@ -38,11 +39,11 @@ func GetData(routeID int64, name string) (*Data, error) {
 		totalRuns        int64
 	)
 
-	if name == "" && routeID == 0 {
-		return nil, errors.New("name or id is required")
+	if routeID == 0 {
+		return nil, errors.New("id is required")
 	}
 
-	rows, err := dataQuery(routeID, name)
+	rows, err := dataQuery(routeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed route data query: %w", err)
 	}
@@ -51,6 +52,7 @@ func GetData(routeID int64, name string) (*Data, error) {
 	d := new(Data)
 	d.Category = &category.Name{}
 	d.SplitNames = []split.Name{}
+	d.Comparison = []time.Duration{}
 	d.RouteBests = []time.Duration{}
 	d.Golds = []time.Duration{}
 
@@ -81,6 +83,13 @@ func GetData(routeID int64, name string) (*Data, error) {
 				sumOfGold = &zero
 			}
 			*sumOfGold += *currGold
+
+			curBestDur := time.Duration(*currBest * 1e6)
+			if len(d.Comparison) == 0 {
+				d.Comparison = append(d.Comparison, curBestDur)
+			} else {
+				d.Comparison = append(d.Comparison, d.Comparison[len(d.Comparison)-1]+curBestDur)
+			}
 			d.RouteBests = append(d.RouteBests, time.Duration(*currBest*1e6))
 			d.Golds = append(d.Golds, time.Duration(*currGold*1e6))
 		}
@@ -111,15 +120,7 @@ func GetData(routeID int64, name string) (*Data, error) {
 	return d, nil
 }
 
-func dataQuery(routeID int64, name string) (*sql.Rows, error) {
-	var where string
-
-	if routeID > 0 {
-		where = "r.id = ?"
-	} else {
-		where = "r.name = ?"
-	}
-
+func dataQuery(routeID int64) (*sql.Rows, error) {
 	query := fmt.Sprintf(`
 SELECT
   sn.id AS split_name_id,
@@ -169,13 +170,10 @@ FROM
       c.id
   ) AS category_best ON category_best.id = c.id
   WHERE
-    %s
+    r.id = ?
 GROUP BY
   sn.id
 ORDER BY r.id, sn.position;
-`, where)
-	if routeID > 0 {
-		return db.Connection.Query(query, routeID)
-	}
-	return db.Connection.Query(query, name)
+`)
+	return db.Connection.Query(query, routeID)
 }

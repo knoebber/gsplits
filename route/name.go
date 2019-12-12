@@ -27,18 +27,29 @@ func (r *Name) Save(tx *sql.Tx) (sql.Result, error) {
 	return tx.Exec("INSERT INTO route(name, category_id) VALUES(?,?)", r.Name, r.CategoryID)
 }
 
+// SearchNames finds route names that contain q.
+func SearchNames(q string) ([]Name, error) {
+	search := "%" + q + "%"
+	rows, err := db.Connection.Query(`SELECT id, name FROM route WHERE name like ? ORDER BY id`, search)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search routes: %w", err)
+	}
+
+	return getNames(rows)
+}
+
 // GetByCategory returns a list routes names that are in the category.
 func GetByCategory(categoryID int64) ([]Name, error) {
-	var (
-		result []Name
-	)
-
 	rows, err := db.Connection.Query(`SELECT id, name FROM route WHERE category_id = ? ORDER BY id`, categoryID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get routes: %w", err)
 	}
+	return getNames(rows)
+}
 
+func getNames(rows *sql.Rows) ([]Name, error) {
 	defer rows.Close()
+	var result []Name
 
 	for rows.Next() {
 		curr := Name{}
@@ -47,6 +58,5 @@ func GetByCategory(categoryID int64) ([]Name, error) {
 		}
 		result = append(result, curr)
 	}
-
 	return result, nil
 }

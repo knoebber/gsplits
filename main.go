@@ -163,26 +163,26 @@ func main() {
 
 	// Search for route name in database by the passed in name.
 	if routeName != "" {
-		d, err = route.GetData(0, routeName)
-
+		routeID, err = findRoute(routeName)
+		if err != nil {
+			exit(err)
+		}
+		d, err = route.GetData(routeID)
 		if err != nil {
 			exit(err)
 		}
 	} else {
 		// Use the category wizard to either create or get an existing category.
-		routeID, err = wizard(routeName)
+		routeID, err = wizard()
 		if err != nil {
 			exit(err)
 		}
 
-		d, err = route.GetData(routeID, "")
+		d, err = route.GetData(routeID)
 		if err != nil {
 			exit(err)
 		}
 	}
-
-	printInfo(d)
-	exitWhenNo("Start? ")
 
 	if err := startSplits(d); err != nil {
 		exit(err)
