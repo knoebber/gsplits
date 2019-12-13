@@ -16,7 +16,7 @@ var validate *validator.Validate
 
 // The name of the sqlite3 db file.
 // Created as a hidden file in the home directory: ~/.gsplits
-const dbName = "gsplits-test"
+const dbName = "gsplits"
 
 // Creates the required tables if they doesn't exist
 func createTables() error {

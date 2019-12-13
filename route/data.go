@@ -24,6 +24,7 @@ type Data struct {
 	Comparison    []time.Duration // The total time that the best run had at each split.
 	RouteBests    []time.Duration // The splits from the fastest completion of the route.
 	Golds         []time.Duration // The fastest a split has ever been completed in the route.
+	TimeSaves     []time.Duration // The difference of a gold and the route best
 }
 
 // GetData gets a routes data by its primary key.
@@ -55,6 +56,7 @@ func GetData(routeID int64) (*Data, error) {
 	d.Comparison = []time.Duration{}
 	d.RouteBests = []time.Duration{}
 	d.Golds = []time.Duration{}
+	d.TimeSaves = []time.Duration{}
 
 	for rows.Next() {
 		sn := split.Name{}
@@ -92,6 +94,7 @@ func GetData(routeID int64) (*Data, error) {
 			}
 			d.RouteBests = append(d.RouteBests, time.Duration(*currBest*1e6))
 			d.Golds = append(d.Golds, time.Duration(*currGold*1e6))
+			d.TimeSaves = append(d.TimeSaves, time.Duration((*currBest-*currGold)*1e6))
 		}
 
 		if len(sn.Name) > d.MaxNameWidth {
