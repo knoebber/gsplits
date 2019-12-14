@@ -40,9 +40,7 @@ func safeDurationString(lst []time.Duration, i int) string {
 }
 
 func newText(text string) tview.Primitive {
-	return tview.NewTextView().
-		SetTextAlign(tview.AlignCenter).
-		SetText(text)
+	return tview.NewTextView().SetText(text)
 }
 
 func newButton(text string) *tview.Button {
@@ -55,7 +53,7 @@ func newButton(text string) *tview.Button {
 	return button
 }
 
-func showPreview(d *route.Data) error {
+func showPreview(d *route.Data) (err error) {
 	var (
 		title string
 		best  string
@@ -82,9 +80,19 @@ func showPreview(d *route.Data) error {
 	}
 	// rows := make([][]string, len(d.SplitNames)+1)
 
-	for col, value := range []string{"Name", "Split Time", "Split Duration", "Gold", "Possible Save"} {
-		setTableCell(0, col, value, tcell.ColorYellow)
+	onTableFocus := func(focus bool) {
+		for col, value := range []string{"Name", "Split Time", "Split Duration", "Gold", "Possible Save"} {
+
+			if focus {
+				setTableCell(0, col, value, tcell.ColorYellow)
+			} else {
+				setTableCell(0, col, value, tcell.ColorWhite)
+			}
+
+		}
 	}
+	// Table is initially focused.
+	onTableFocus(true)
 
 	for i := range d.SplitNames {
 		for j, value := range []string{
@@ -98,7 +106,46 @@ func showPreview(d *route.Data) error {
 		}
 	}
 
+	startButton := newButton("Start").SetSelectedFunc(func() {
+		err = startTimer(d)
+		if err != nil {
+			app.Stop()
+		}
+	})
+	quitButton := newButton("Quit").SetSelectedFunc(func() {
+		app.Stop()
+	})
+
+	startButton.SetBlurFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyTab:
+			app.SetFocus(quitButton)
+		}
+	})
+	quitButton.SetBlurFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyTab:
+			onTableFocus(true)
+			app.SetFocus(table)
+		}
+	})
+
 	table.SetFixed(1, 1)
+	table.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEnter:
+			err = startTimer(d)
+			if err != nil {
+				app.Stop()
+			}
+		case tcell.KeyTab:
+			onTableFocus(false)
+			app.SetFocus(startButton)
+		case tcell.KeyExit:
+			app.Stop()
+		}
+	})
+
 	// 	if key == tcell.KeyEscape {
 	// 		app.Stop()
 	// 	}
@@ -118,19 +165,22 @@ func showPreview(d *route.Data) error {
 		AddItem(table, 0, 8, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow), 0, 1, false).
 		AddItem(tview.NewFlex().
-			AddItem(newButton("Start"), 10, 1, false).
+			AddItem(startButton, 10, 1, false).
 			AddItem(nil, 7, 2, false).
-			AddItem(newButton("(Q)uit"), 10, 1, false),
+			AddItem(quitButton, 10, 1, false),
 			0, 1, true)
 
-	if err := app.SetRoot(flex, true).SetFocus(table).Run(); err != nil {
-		return err
-	}
+	err = app.SetRoot(flex, true).SetFocus(table).Run()
+	return
+}
 
+func startTimer(d *route.Data) error {
+	text := newText("test")
+	app.SetRoot(text, true)
 	return nil
 }
 
-func startSplits(d *route.Data) error {
+func startApp(d *route.Data) error {
 	app = tview.NewApplication()
 	view = tview.NewBox().SetDrawFunc(drawTime)
 	return showPreview(d)

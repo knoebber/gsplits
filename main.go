@@ -180,7 +180,7 @@ func main() {
 		}
 	}
 
-	if err := startSplits(d); err != nil {
+	if err := startApp(d); err != nil {
 		exit(err)
 	}
 }
