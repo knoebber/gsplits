@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -55,6 +56,22 @@ func newButton(text string) *tview.Button {
 }
 
 func showPreview(d *route.Data) error {
+	var (
+		title string
+		best  string
+	)
+
+	title = fmt.Sprintf("%s: %s", d.Category.Name, d.RouteName)
+	if d.Category.Best != nil {
+		best = fmt.Sprintf("%s Best: %s", d.Category.Name, *d.Category.Best)
+		if d.RouteBestTime != nil && *d.Category.Best < *d.RouteBestTime {
+			// Print the route best time only if its slower than the categories best.
+			best += fmt.Sprintf("\n%s Best: %s", d.RouteName, *d.RouteBestTime)
+		}
+	} else {
+		best = "No runs yet"
+	}
+
 	table := tview.NewTable().SetBorders(true)
 	setTableCell := func(row, column int, value string, color tcell.Color) {
 		table.SetCell(row, column,
@@ -94,7 +111,11 @@ func showPreview(d *route.Data) error {
 	// })
 
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).
-		AddItem(table, 0, 9, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow), 0, 1, false).
+		AddItem(tview.NewFlex().
+			AddItem(newText(title), 0, 1, false).
+			AddItem(newText(best), 0, 1, false), 0, 1, true).
+		AddItem(table, 0, 8, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow), 0, 1, false).
 		AddItem(tview.NewFlex().
 			AddItem(newButton("Start"), 10, 1, false).
@@ -105,39 +126,7 @@ func showPreview(d *route.Data) error {
 	if err := app.SetRoot(flex, true).SetFocus(table).Run(); err != nil {
 		return err
 	}
-	// 	p := widgets.NewParagraph()
-	// 	p.Title = fmt.Sprintf("%s: %s", d.Category.Name, d.RouteName)
-	// 	if d.Category.Best != nil {
-	// 		p.Text = fmt.Sprintf("%s Best: %s", d.Category.Name, *d.Category.Best)
-	// 		if d.RouteBestTime != nil && *d.Category.Best < *d.RouteBestTime {
-	// 			// Print the route best time only if its slower than the categories best.
-	// 			p.Text += fmt.Sprintf("\n%s Best: %s", d.RouteName, *d.RouteBestTime)
-	// 		}
-	// 	} else {
-	// 		p.Text = "No runs yet"
-	// 	}
-	// 	p.Text += "\nStart or q to quit"
 
-	// 	dataTable := widgets.NewTable()
-	// 	dataTable.Rows = rows
-	// 	dataTable.TextStyle = ui.NewStyle(ui.ColorWhite)
-	// button := 	// button.SetBorder(true).SetRect(0, 0, 22, 3)
-	// if err := app.SetRoot(button, false).SetFocus(button).Run(); err != nil {
-	// 	panic(err)
-	// }
-	// return nil
-
-	// table.Select(0, 0).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
-	// 	if key == tcell.KeyEscape {
-	// 		app.Stop()
-	// 	}
-	// 	if key == tcell.KeyEnter {
-	// 		table.SetSelectable(true, true)
-	// 	}
-	// }).SetSelectedFunc(func(row int, column int) {
-	// 	table.GetCell(row, column).SetTextColor(tcell.ColorRed)
-	// 	table.SetSelectable(false, false)
-	// })
 	return nil
 }
 
