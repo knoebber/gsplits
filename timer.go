@@ -1,23 +1,24 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/knoebber/gsplits/route"
 	"github.com/rivo/tview"
 )
 
-const refreshInterval = 60 / time.Second
+// Measure times to the tenth of a second.
+const (
+	refreshInterval = time.Second / 10
+	timeFormat      = "15:04:05.0"
+)
 
 var (
-	view *tview.Box
-	app  *tview.Application
+	timer *tview.Box
 )
 
 func drawTime(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
-	timeStr := time.Now().Format("Current time is 15:04:05")
+	timeStr := time.Now().Format(timeFormat)
 	tview.Print(screen, timeStr, x, height/2, width, tview.AlignCenter, tcell.ColorLime)
 	return 0, 0, 0, 0
 }
@@ -32,190 +33,12 @@ func refresh() {
 	}
 }
 
-func safeDurationString(lst []time.Duration, i int) string {
-	if i > len(lst)-1 {
-		return "N/A"
-	}
-	return lst[i].String()
-}
-
-func newText(text string) tview.Primitive {
-	return tview.NewTextView().SetText(text)
-}
-
-func newButton(text string) *tview.Button {
-	button := tview.NewButton(text).SetSelectedFunc(
-		func() {
-			app.Stop()
-		},
-	)
-	button.SetBorder(true)
-	return button
-}
-
-func showPreview(d *route.Data) (err error) {
-	var (
-		title string
-		best  string
-	)
-
-	title = fmt.Sprintf("%s: %s", d.Category.Name, d.RouteName)
-	if d.Category.Best != nil {
-		best = fmt.Sprintf("%s Best: %s", d.Category.Name, *d.Category.Best)
-		if d.RouteBestTime != nil && *d.Category.Best < *d.RouteBestTime {
-			// Print the route best time only if its slower than the categories best.
-			best += fmt.Sprintf("\n%s Best: %s", d.RouteName, *d.RouteBestTime)
-		}
-	} else {
-		best = "No runs yet"
+func startTimer() error {
+	timer = tview.NewBox().SetDrawFunc(drawTime)
+	if err := app.SetRoot(timer, true).Run(); err != nil {
+		panic(err)
 	}
 
-	table := tview.NewTable().SetBorders(true)
-	setTableCell := func(row, column int, value string, color tcell.Color) {
-		table.SetCell(row, column,
-			tview.NewTableCell(value).
-				SetTextColor(color).
-				SetAlign(tview.AlignCenter))
-
-	}
-	// rows := make([][]string, len(d.SplitNames)+1)
-
-	onTableFocus := func(focus bool) {
-		for col, value := range []string{"Name", "Split Time", "Split Duration", "Gold", "Possible Save"} {
-
-			if focus {
-				setTableCell(0, col, value, tcell.ColorYellow)
-			} else {
-				setTableCell(0, col, value, tcell.ColorWhite)
-			}
-
-		}
-	}
-	// Table is initially focused.
-	onTableFocus(true)
-
-	for i := range d.SplitNames {
-		for j, value := range []string{
-			d.SplitNames[i].Name,
-			safeDurationString(d.Comparison, i),
-			safeDurationString(d.RouteBests, i),
-			safeDurationString(d.Golds, i),
-			safeDurationString(d.TimeSaves, i),
-		} {
-			setTableCell(i+1, j, value, tcell.ColorWhite)
-		}
-	}
-
-	startButton := newButton("Start").SetSelectedFunc(func() {
-		err = startTimer(d)
-		if err != nil {
-			app.Stop()
-		}
-	})
-	quitButton := newButton("Quit").SetSelectedFunc(func() {
-		app.Stop()
-	})
-
-	startButton.SetBlurFunc(func(key tcell.Key) {
-		switch key {
-		case tcell.KeyTab:
-			app.SetFocus(quitButton)
-		}
-	})
-	quitButton.SetBlurFunc(func(key tcell.Key) {
-		switch key {
-		case tcell.KeyTab:
-			onTableFocus(true)
-			app.SetFocus(table)
-		}
-	})
-
-	table.SetFixed(1, 1)
-	table.SetDoneFunc(func(key tcell.Key) {
-		switch key {
-		case tcell.KeyEnter:
-			err = startTimer(d)
-			if err != nil {
-				app.Stop()
-			}
-		case tcell.KeyTab:
-			onTableFocus(false)
-			app.SetFocus(startButton)
-		case tcell.KeyExit:
-			app.Stop()
-		}
-	})
-
-	// 	if key == tcell.KeyEscape {
-	// 		app.Stop()
-	// 	}
-	// 	if key == tcell.KeyEnter {
-	// 		table.SetSelectable(true, true)
-	// 	}
-	// }).SetSelectedFunc(func(row int, column int) {
-	// 	table.GetCell(row, column).SetTextColor(tcell.ColorRed)
-	// 	table.SetSelectable(false, false)
-	// })
-
-	flex := tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow), 0, 1, false).
-		AddItem(tview.NewFlex().
-			AddItem(newText(title), 0, 1, false).
-			AddItem(newText(best), 0, 1, false), 0, 1, true).
-		AddItem(table, 0, 8, false).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow), 0, 1, false).
-		AddItem(tview.NewFlex().
-			AddItem(startButton, 10, 1, false).
-			AddItem(nil, 7, 2, false).
-			AddItem(quitButton, 10, 1, false),
-			0, 1, true)
-
-	err = app.SetRoot(flex, true).SetFocus(table).Run()
-	return
-}
-
-func startTimer(d *route.Data) error {
-	text := newText("test")
-	app.SetRoot(text, true)
+	go refresh()
 	return nil
 }
-
-func startApp(d *route.Data) error {
-	app = tview.NewApplication()
-	view = tview.NewBox().SetDrawFunc(drawTime)
-	return showPreview(d)
-}
-
-// func main() {
-// 	menu := newPrimitive("Menu")
-// 	main := newPrimitive("Main content")
-// 	sideBar := newPrimitive("Side Bar")
-
-// 	grid := tview.NewGrid().
-// 		SetRows(3, 0, 3).
-// 		SetColumns(30, 0, 30).
-// 		SetBorders(true).
-// 		AddItem(newPrimitive("Header"), 0, 0, 1, 3, 0, 0, false).
-// 		AddItem(newPrimitive("Footer"), 2, 0, 1, 3, 0, 0, false)
-
-// 	// Layout for screens narrower than 100 cells (menu and side bar are hidden).
-// 	grid.AddItem(menu, 0, 0, 0, 0, 0, 0, false).
-// 		AddItem(main, 1, 0, 1, 3, 0, 0, false).
-// 		AddItem(sideBar, 0, 0, 0, 0, 0, 0, false)
-
-// 	// Layout for screens wider than 100 cells.
-// 	grid.AddItem(menu, 1, 0, 1, 1, 0, 100, false).
-// 		AddItem(main, 1, 1, 1, 1, 0, 100, false).
-// 		AddItem(sideBar, 1, 2, 1, 1, 0, 100, false)
-
-// 	if err := tview.NewApplication().SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
-// 		panic(err)
-// 	}
-// }
-
-// 	go refresh()
-// 	if err := app.SetRoot(view, true).Run(); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }

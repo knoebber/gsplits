@@ -7,6 +7,7 @@ import (
 
 	"github.com/knoebber/gsplits/db"
 	"github.com/knoebber/gsplits/route"
+	"github.com/rivo/tview"
 )
 
 // Start showing time save within this many nano seconds
@@ -20,6 +21,8 @@ const (
 	aheadColor  = "\033[1;32m%-*s\033[0m"
 	behindColor = "\033[1;31m%-*s\033[0m"
 )
+
+var app *tview.Application
 
 // // On enter press erase the line above and send true to the channel.
 // // This lets the main loop know to split.
@@ -180,7 +183,8 @@ func main() {
 		}
 	}
 
-	if err := startApp(d); err != nil {
+	app = tview.NewApplication()
+	if err := showPreview(d); err != nil {
 		exit(err)
 	}
 }
