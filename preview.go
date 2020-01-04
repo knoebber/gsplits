@@ -47,23 +47,19 @@ func showPreview(d *route.Data) (err error) {
 		best = "No runs yet"
 	}
 
-	table := tview.NewTable().SetBorders(true)
-	setTableCell := func(row, column int, value string, color tcell.Color) {
-		table.SetCell(row, column,
-			tview.NewTableCell(value).
-				SetTextColor(color).
-				SetAlign(tview.AlignCenter))
+	table := newTable()
 
-	}
 	// rows := make([][]string, len(d.SplitNames)+1)
 
 	onTableFocus := func(focus bool) {
-		for col, value := range []string{"Name", "Split Time", "Split Duration", "Gold", "Possible Save"} {
+		for col, value := range []string{
+			"Name", "Split Time", "Split Duration", "Gold", "Possible Save",
+		} {
 
 			if focus {
-				setTableCell(0, col, value, tcell.ColorYellow)
+				setTableCell(table, 0, col, value, tcell.ColorYellow)
 			} else {
-				setTableCell(0, col, value, tcell.ColorWhite)
+				setTableCell(table, 0, col, value, tcell.ColorWhite)
 			}
 
 		}
@@ -79,7 +75,7 @@ func showPreview(d *route.Data) (err error) {
 			safeDurationString(d.Golds, i),
 			safeDurationString(d.TimeSaves, i),
 		} {
-			setTableCell(i+1, j, value, tcell.ColorWhite)
+			setTableCell(table, i+1, j, value, tcell.ColorWhite)
 		}
 	}
 
@@ -114,9 +110,9 @@ func showPreview(d *route.Data) (err error) {
 			if err = startTimer(); err != nil {
 				panic(err)
 			}
-			if err = app.SetRoot(timer, true).Run(); err != nil {
-				panic(err)
-			}
+			// if err = app.SetRoot(timer, true).Run(); err != nil {
+			//	panic(err)
+			//}
 		case tcell.KeyTab:
 			onTableFocus(false)
 			app.SetFocus(startButton)
