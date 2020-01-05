@@ -10,9 +10,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// Start showing time save within this many nano seconds
-const plusMinusThreshold = (10 * 1e9) * -1
-
 // The amount of padding characters to put around times.
 const timePadding = 13
 
@@ -148,9 +145,9 @@ func exit(err error) {
 
 func main() {
 	var (
-		routeID int64
-		err     error
-		d       *route.Data
+		routeID   int64
+		err       error
+		routeData *route.Data
 	)
 	if err = db.Start(); err != nil {
 		exit(err)
@@ -166,7 +163,7 @@ func main() {
 		if err != nil {
 			exit(err)
 		}
-		d, err = route.GetData(routeID)
+		routeData, err = route.GetData(routeID)
 		if err != nil {
 			exit(err)
 		}
@@ -177,14 +174,14 @@ func main() {
 			exit(err)
 		}
 
-		d, err = route.GetData(routeID)
+		routeData, err = route.GetData(routeID)
 		if err != nil {
 			exit(err)
 		}
 	}
 
 	app = tview.NewApplication()
-	if err := showPreview(d); err != nil {
+	if err := showPreview(routeData); err != nil {
 		exit(err)
 	}
 }

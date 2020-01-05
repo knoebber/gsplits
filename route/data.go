@@ -27,6 +27,19 @@ type Data struct {
 	TimeSaves     []time.Duration // The difference of a gold and the route best
 }
 
+// TODO add methods for getting a SplitName, Comparison, etc.
+
+// GetBPT gets the "best possible time".
+// It is the current elapsed time added to the rest of the golds left.
+func (d *Data) GetBPT(lastTotal time.Duration, splitIndex int) (bpt time.Duration) {
+	bpt = lastTotal
+	remaining := d.Golds[splitIndex:]
+	for _, gold := range remaining {
+		bpt += gold
+	}
+	return
+}
+
 // GetData gets a routes data by its primary key.
 // Returns nil if the route isn't found.
 func GetData(routeID int64) (*Data, error) {
