@@ -14,10 +14,10 @@ const plusMinusThreshold = (10 * 1e9) * -1
 var (
 	runStart         time.Time
 	segmentStart     time.Time
-	splitsTable      *tview.Table
 	currentGold      time.Duration
 	possibleTimeSave time.Duration
 
+	splitsTable          *tview.Table
 	totalTimeView        *tview.TextView
 	segmentTimeView      *tview.TextView
 	goldView             *tview.TextView
@@ -27,28 +27,50 @@ var (
 	splitIndex int
 )
 
-func nextSplit() {
-	segmentStart = time.Now()
+func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Color, bool) {
+	var plusMinusColor tcell.Color
 
+	diff := total - routeData.Comparison[splitIndex]
+	plusMinus := durationStr(diff)
+	if diff <= 0 {
+		plusMinusColor = tcell.ColorGreen
+	} else {
+		plusMinusColor = tcell.ColorRed
+	}
+	showPlusMinus := diff > plusMinusThreshold
+
+	return plusMinus, plusMinusColor, showPlusMinus
+}
+
+func nextSplit(routeData *route.Data) {
 	splitTime := time.Since(runStart)
+	plusMinus, plusMinusColor, _ := getPlusMinus(routeData, splitTime)
+
 	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorWhite)
+
+	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
+
+	segmentStart = time.Now()
 	splitIndex++
 }
 
-// Returning nil stops the input from propagating.
-func inputHandler(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Rune() {
-	case ' ':
-		nextSplit()
-		return nil
-	}
+func getInputHandler(routeData *route.Data) func(event *tcell.EventKey) *tcell.EventKey {
+	// Returning nil stops the input from propagating.
+	return func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Rune() {
+		case ' ':
+			nextSplit(routeData)
+			return nil
+		}
 
-	switch event.Key() {
-	case tcell.KeyEnter:
-		nextSplit()
-		return nil
+		switch event.Key() {
+		case tcell.KeyEnter:
+			nextSplit(routeData)
+			return nil
+		}
+		return event
 	}
-	return event
 }
 
 func setSplitsTable(routeData *route.Data) {
@@ -65,22 +87,12 @@ func setSplitsTable(routeData *route.Data) {
 	}
 }
 
-// Draws an active row.
+// Draws the row for the active split.
 func drawCurrentSplitRow(routeData *route.Data, runDuration time.Duration) {
-	var (
-		plusMinus      string
-		plusMinusColor tcell.Color
-	)
-	diff := runDuration - routeData.Comparison[splitIndex]
-	plusMinus = durationStr(diff)
-	if diff <= 0 {
-		plusMinusColor = tcell.ColorGreen
-	} else {
-		plusMinusColor = tcell.ColorRed
-	}
+	plusMinus, plusMinusColor, showPlusMinus := getPlusMinus(routeData, runDuration)
 
 	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorYellow)
-	if diff > plusMinusThreshold {
+	if showPlusMinus {
 		setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
 	}
 }
@@ -125,7 +137,7 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 		AddItem(sumOfGold, 1, 0, false)
 }
 
-func liveTimeDrawer(routeData *route.Data) func() {
+func getDrawFunc(routeData *route.Data) func() {
 	return func() {
 		runDuration := time.Since(runStart)
 
@@ -140,7 +152,7 @@ func liveTimeDrawer(routeData *route.Data) func() {
 
 func refresh(routeData *route.Data) {
 	tick := time.NewTicker(refreshInterval)
-	drawFunc := liveTimeDrawer(routeData)
+	drawFunc := getDrawFunc(routeData)
 
 	for {
 		select {
@@ -169,5 +181,5 @@ func startTimer(routeData *route.Data) {
 		AddItem(createSplitsFlex(routeData), 0, 4, false)
 
 	go refresh(routeData)
-	app.SetRoot(container, true).SetInputCapture(inputHandler)
+	app.SetRoot(container, true).SetInputCapture(getInputHandler(routeData))
 }
