@@ -8,8 +8,12 @@ import (
 	"github.com/rivo/tview"
 )
 
-// Start showing time save within this many nano seconds
-const plusMinusThreshold = (10 * 1e9) * -1
+const (
+	// Start showing time save within this many nano seconds
+	plusMinusThreshold = (10 * 1e9) * -1
+
+	placeholder = "___"
+)
 
 var (
 	runStart         time.Time
@@ -28,7 +32,10 @@ var (
 )
 
 func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Color, bool) {
-	var plusMinusColor tcell.Color
+	var (
+		lastDiff       time.Duration
+		plusMinusColor tcell.Color
+	)
 
 	diff := total - routeData.Comparison[splitIndex]
 	plusMinus := durationStr(diff)
@@ -37,37 +44,76 @@ func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Col
 	} else {
 		plusMinusColor = tcell.ColorRed
 	}
-	showPlusMinus := diff > plusMinusThreshold
+
+	if splitIndex > 0 {
+		lastDiff = total - routeData.Comparison[splitIndex-1]
+	}
+
+	showPlusMinus := diff > (plusMinusThreshold + (lastDiff * -1))
 
 	return plusMinus, plusMinusColor, showPlusMinus
 }
 
-func nextSplit(routeData *route.Data) {
-	splitTime := time.Since(runStart)
-	plusMinus, plusMinusColor, _ := getPlusMinus(routeData, splitTime)
+func previousSplit(routeData *route.Data, segments []time.Duration) {
+	if splitIndex == 0 {
+		return
+	}
 
-	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorWhite)
+	// Make the current row inactive
+	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
+
+	// Make the previous row active again.
+	splitIndex--
+	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 2, durationStr(routeData.RouteBests[splitIndex]), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 3, lstDurationStr(routeData.Comparison, splitIndex), tcell.ColorWhite)
+
+	// Reset the segment time.
+	now := time.Now()
+	lastSegment := segments[splitIndex]
+	revert := now.Sub(segmentStart)
+	segmentStart = now.Add((lastSegment + revert) * -1)
+	segments[splitIndex] = 0
+}
+
+func nextSplit(routeData *route.Data, segments []time.Duration) {
+	if splitIndex == len(routeData.SplitNames) {
+		return
+	}
+
+	splitTime := time.Since(runStart)
+	segmentTime := time.Since(segmentStart)
+
+	plusMinus, plusMinusColor, _ := getPlusMinus(routeData, splitTime)
 
 	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorWhite)
 	setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
+	setTableCell(splitsTable, splitIndex, 2, durationStr(segmentTime), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorWhite)
+
+	segments[splitIndex] = segmentTime
 
 	segmentStart = time.Now()
 	splitIndex++
+
 }
 
-func getInputHandler(routeData *route.Data) func(event *tcell.EventKey) *tcell.EventKey {
+func getInputHandler(routeData *route.Data, segments []time.Duration) func(event *tcell.EventKey) *tcell.EventKey {
 	// Returning nil stops the input from propagating.
 	return func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case ' ':
-			nextSplit(routeData)
+			nextSplit(routeData, segments)
 			return nil
 		}
 
 		switch event.Key() {
 		case tcell.KeyEnter:
-			nextSplit(routeData)
+			nextSplit(routeData, segments)
 			return nil
+		case tcell.KeyCtrlSpace:
+			previousSplit(routeData, segments)
 		}
 		return event
 	}
@@ -78,7 +124,7 @@ func setSplitsTable(routeData *route.Data) {
 	for i := range routeData.SplitNames {
 		for j, value := range []string{
 			routeData.SplitNames[i].Name,
-			"___",
+			placeholder,
 			lstDurationStr(routeData.RouteBests, i),
 			lstDurationStr(routeData.Comparison, i),
 		} {
@@ -137,7 +183,7 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 		AddItem(sumOfGold, 1, 0, false)
 }
 
-func getDrawFunc(routeData *route.Data) func() {
+func getDrawFunc(routeData *route.Data, segments []time.Duration) func() {
 	return func() {
 		runDuration := time.Since(runStart)
 
@@ -150,11 +196,11 @@ func getDrawFunc(routeData *route.Data) func() {
 	}
 }
 
-func refresh(routeData *route.Data) {
+func refresh(routeData *route.Data, splits []time.Duration) {
 	tick := time.NewTicker(refreshInterval)
-	drawFunc := getDrawFunc(routeData)
+	drawFunc := getDrawFunc(routeData, splits)
 
-	for {
+	for splitIndex < len(routeData.SplitNames) {
 		select {
 		case <-tick.C:
 			app.QueueUpdateDraw(drawFunc)
@@ -162,7 +208,9 @@ func refresh(routeData *route.Data) {
 	}
 }
 
+// func saveRun(routeID int64, durations []time.Duration, totalDuration time.Duration) (runID int64, err error) {
 func startTimer(routeData *route.Data) {
+	segments := make([]time.Duration, len(routeData.SplitNames))
 	now := time.Now()
 	runStart = now
 	segmentStart = now
@@ -180,6 +228,6 @@ func startTimer(routeData *route.Data) {
 		AddItem(nil, 0, 1, false).
 		AddItem(createSplitsFlex(routeData), 0, 4, false)
 
-	go refresh(routeData)
-	app.SetRoot(container, true).SetInputCapture(getInputHandler(routeData))
+	go refresh(routeData, segments)
+	app.SetRoot(container, true).SetInputCapture(getInputHandler(routeData, segments))
 }
