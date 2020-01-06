@@ -11,6 +11,9 @@ import (
 	"github.com/knoebber/gsplits/split"
 )
 
+// TODO rename splits => segments
+// TODO rename RouteBests ComparisonSegments
+
 // Data contains information about an route.
 type Data struct {
 	RouteName     string          // The name of the route.
@@ -19,7 +22,6 @@ type Data struct {
 	RouteBestTime *time.Duration  // The fastest time this route has been completed.
 	TotalRuns     int64           // The total amount of runs in this route.
 	SumOfGold     *time.Duration  // The sum of the gold splits.
-	MaxNameWidth  int             // The widest route name. TODO remove after adding lib.
 	SplitNames    []split.Name    // The names of the splits in the category.
 	Comparison    []time.Duration // The total time that the best run had at each split.
 	RouteBests    []time.Duration // The splits from the fastest completion of the route.
@@ -110,9 +112,6 @@ func GetData(routeID int64) (*Data, error) {
 			d.TimeSaves = append(d.TimeSaves, time.Duration((*currBest-*currGold)*1e6))
 		}
 
-		if len(sn.Name) > d.MaxNameWidth {
-			d.MaxNameWidth = len(sn.Name)
-		}
 	}
 
 	if sumOfGold != nil {
