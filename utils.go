@@ -1,29 +1,30 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 )
 
-// Accuracy of time measurment.
 const (
+	// Accuracy of time measurment.
 	refreshInterval = time.Second / 10
-)
 
-func newButton(text string) *tview.Button {
-	button := tview.NewButton(text).SetSelectedFunc(
-		func() {
-			app.Stop()
-		},
-	)
-	button.SetBorder(true)
-	return button
-}
+	// The minimum size a duration string will be.
+	// Prevents containers from resizing as the duration size changes sizes.
+	minDurationLength = 10
+)
 
 func newText(text string) *tview.TextView {
 	return tview.NewTextView().SetText(text)
+}
+
+func newButton(text string) *tview.Button {
+	button := tview.NewButton(text)
+	button.SetBorder(true)
+	return button
 }
 
 func newTable() *tview.Table {
@@ -56,8 +57,8 @@ func elapsedStr(start time.Time) string {
 	return durationStr(time.Since(start))
 }
 
-// TODO make better formatter. Not showing 0 is breaking things.
 func durationStr(d time.Duration) string {
+	// Show only as many digits at the refresh interval.
 	d = d - (d % refreshInterval)
-	return d.String()
+	return fmt.Sprintf("%*s", minDurationLength, d)
 }
