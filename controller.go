@@ -92,7 +92,7 @@ func saveRoute(categoryID int64, name string, splitNames []string) (routeID int6
 	return
 }
 
-func saveRun(routeID int64, durations []time.Duration, totalDuration time.Duration) (runID int64, err error) {
+func saveRun(routeID int64, segments []time.Duration, totalDuration time.Duration) (runID int64, err error) {
 	var (
 		tx         *sql.Tx
 		splitNames []split.Name
@@ -118,10 +118,10 @@ func saveRun(routeID int64, durations []time.Duration, totalDuration time.Durati
 		return
 	}
 
-	for i, duration := range durations {
+	for i, segment := range segments {
 		d := &split.Duration{
 			RunID:    runID,
-			Duration: duration,
+			Duration: segment,
 			NameID:   splitNames[i].ID,
 		}
 		if _, err = save(d, tx); err != nil {

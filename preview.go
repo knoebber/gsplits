@@ -29,7 +29,7 @@ func showPreview(routeData *route.Data) (err error) {
 
 	onTableFocus := func(focus bool) {
 		for col, value := range []string{
-			"Name", "Split Time", "Split Duration", "Gold", "Possible Save",
+			"Name", "Split Time", "Segment Duration", "Gold", "Possible Save",
 		} {
 
 			if focus {
@@ -45,11 +45,11 @@ func showPreview(routeData *route.Data) (err error) {
 
 	for i := range routeData.SplitNames {
 		for j, value := range []string{
-			routeData.SplitNames[i].Name,
-			lstDurationStr(routeData.Comparison, i),
-			lstDurationStr(routeData.RouteBests, i),
-			lstDurationStr(routeData.Golds, i),
-			lstDurationStr(routeData.TimeSaves, i),
+			routeData.GetSplitName(i),
+			durationStr(routeData.GetComparisonSplit(i)),
+			durationStr(routeData.GetComparisonSegment(i)),
+			durationStr(routeData.GetGold(i)),
+			durationStr(routeData.GetTimeSave(i)),
 		} {
 			setTableCell(table, i+1, j, value, tcell.ColorWhite)
 		}
@@ -70,6 +70,7 @@ func showPreview(routeData *route.Data) (err error) {
 	startButton := newButton("Start").SetSelectedFunc(func() {
 		startTimer(routeData)
 	})
+
 	startButton.SetBlurFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyTab:

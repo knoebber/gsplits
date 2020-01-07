@@ -11,8 +11,7 @@ import (
 const (
 	// Start showing time save within this many nano seconds
 	plusMinusThreshold = (10 * 1e9) * -1
-
-	placeholder = "___"
+	placeholder        = "___"
 )
 
 var (
@@ -37,7 +36,7 @@ func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Col
 		plusMinusColor tcell.Color
 	)
 
-	diff := total - routeData.Comparison[splitIndex]
+	diff := total - routeData.GetComparisonSplit(splitIndex)
 	plusMinus := durationStr(diff)
 	if diff <= 0 {
 		plusMinusColor = tcell.ColorGreen
@@ -46,7 +45,7 @@ func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Col
 	}
 
 	if splitIndex > 0 {
-		lastDiff = total - routeData.Comparison[splitIndex-1]
+		lastDiff = total - routeData.GetComparisonSplit(splitIndex-1)
 	}
 
 	showPlusMinus := diff > (plusMinusThreshold + (lastDiff * -1))
@@ -58,27 +57,28 @@ func previousSplit(routeData *route.Data, segments []time.Duration) {
 	if splitIndex == 0 {
 		return
 	}
+	segments[splitIndex] = 0
 
 	// Make the current row inactive
-	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorWhite)
 	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
 
 	// Make the previous row active again.
 	splitIndex--
 	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 2, durationStr(routeData.RouteBests[splitIndex]), tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 3, lstDurationStr(routeData.Comparison, splitIndex), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 2, durationStr(routeData.GetComparisonSegment(splitIndex)), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 3, durationStr(routeData.GetComparisonSplit(splitIndex)), tcell.ColorWhite)
 
 	// Reset the segment time.
 	now := time.Now()
 	lastSegment := segments[splitIndex]
 	revert := now.Sub(segmentStart)
 	segmentStart = now.Add((lastSegment + revert) * -1)
-	segments[splitIndex] = 0
 }
 
 func nextSplit(routeData *route.Data, segments []time.Duration) {
-	if splitIndex == len(routeData.SplitNames) {
+	// If the last segment is already filled in don't attempt to advance.
+	if segments[len(segments)-1] != 0 {
 		return
 	}
 
@@ -87,16 +87,17 @@ func nextSplit(routeData *route.Data, segments []time.Duration) {
 
 	plusMinus, plusMinusColor, _ := getPlusMinus(routeData, splitTime)
 
-	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorWhite)
 	setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
 	setTableCell(splitsTable, splitIndex, 2, durationStr(segmentTime), tcell.ColorWhite)
 	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorWhite)
 
 	segments[splitIndex] = segmentTime
 
-	segmentStart = time.Now()
-	splitIndex++
-
+	if splitIndex < routeData.Length-1 {
+		segmentStart = time.Now()
+		splitIndex++
+	}
 }
 
 func getInputHandler(routeData *route.Data, segments []time.Duration) func(event *tcell.EventKey) *tcell.EventKey {
@@ -123,10 +124,10 @@ func setSplitsTable(routeData *route.Data) {
 	splitsTable = newTable()
 	for i := range routeData.SplitNames {
 		for j, value := range []string{
-			routeData.SplitNames[i].Name,
+			routeData.GetSplitName(i),
 			placeholder,
-			lstDurationStr(routeData.RouteBests, i),
-			lstDurationStr(routeData.Comparison, i),
+			durationStr(routeData.GetComparisonSegment(i)),
+			durationStr(routeData.GetComparisonSplit(i)),
 		} {
 			setTableCell(splitsTable, i, j, value, tcell.ColorWhite)
 		}
@@ -137,7 +138,7 @@ func setSplitsTable(routeData *route.Data) {
 func drawCurrentSplitRow(routeData *route.Data, runDuration time.Duration) {
 	plusMinus, plusMinusColor, showPlusMinus := getPlusMinus(routeData, runDuration)
 
-	setTableCell(splitsTable, splitIndex, 0, routeData.SplitNames[splitIndex].Name, tcell.ColorYellow)
+	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorYellow)
 	if showPlusMinus {
 		setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
 	}
@@ -190,17 +191,18 @@ func getDrawFunc(routeData *route.Data, segments []time.Duration) func() {
 		drawCurrentSplitRow(routeData, runDuration)
 		totalTimeView.SetText(elapsedStr(runStart))
 		segmentTimeView.SetText(elapsedStr(segmentStart))
-		goldView.SetText(lstDurationStr(routeData.Golds, splitIndex))
-		possibleTimeSaveView.SetText(lstDurationStr(routeData.TimeSaves, splitIndex))
+		goldView.SetText(durationStr(routeData.GetGold(splitIndex)))
+		possibleTimeSaveView.SetText(durationStr(routeData.GetTimeSave(splitIndex)))
 		bestPossibleTimeView.SetText(durationStr(routeData.GetBPT(runDuration, splitIndex)))
 	}
 }
 
-func refresh(routeData *route.Data, splits []time.Duration) {
+func refresh(routeData *route.Data, segments []time.Duration) {
 	tick := time.NewTicker(refreshInterval)
-	drawFunc := getDrawFunc(routeData, splits)
+	drawFunc := getDrawFunc(routeData, segments)
 
-	for splitIndex < len(routeData.SplitNames) {
+	// Stop redrawing when the last segment is filled in.
+	for segments[len(segments)-1] == 0 {
 		select {
 		case <-tick.C:
 			app.QueueUpdateDraw(drawFunc)
@@ -210,7 +212,7 @@ func refresh(routeData *route.Data, splits []time.Duration) {
 
 // func saveRun(routeID int64, durations []time.Duration, totalDuration time.Duration) (runID int64, err error) {
 func startTimer(routeData *route.Data) {
-	segments := make([]time.Duration, len(routeData.SplitNames))
+	segments := make([]time.Duration, routeData.Length)
 	now := time.Now()
 	runStart = now
 	segmentStart = now
@@ -218,9 +220,9 @@ func startTimer(routeData *route.Data) {
 	// Times that are redrawn
 	totalTimeView = newText(elapsedStr(now))
 	segmentTimeView = newText(elapsedStr(now))
-	goldView = newText(lstDurationStr(routeData.Golds, 0))
-	possibleTimeSaveView = newText(lstDurationStr(routeData.TimeSaves, 0))
-	bestPossibleTimeView = newText(lstDurationStr(routeData.Golds, 0))
+	goldView = newText(durationStr(routeData.GetGold(0)))
+	possibleTimeSaveView = newText(durationStr(routeData.GetTimeSave(0)))
+	bestPossibleTimeView = newText(durationStr(routeData.GetGold(0)))
 
 	setSplitsTable(routeData)
 	container := tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).

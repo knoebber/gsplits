@@ -20,6 +20,7 @@ const dbName = "gsplits"
 
 // Creates the required tables if they doesn't exist
 func createTables() error {
+	// TODO refactor tables: split => segment
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS category(
                         id   INTEGER PRIMARY KEY,

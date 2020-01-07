@@ -39,13 +39,6 @@ func setTableCell(table *tview.Table, row, column int, value string, color tcell
 
 }
 
-func lstDurationStr(lst []time.Duration, i int) string {
-	if i > len(lst)-1 {
-		return "N/A"
-	}
-	return durationStr(lst[i])
-}
-
 func safeDurationStr(d *time.Duration) string {
 	if d == nil {
 		return "N/A"
