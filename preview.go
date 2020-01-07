@@ -35,7 +35,7 @@ func showPreview(routeData *route.Data) (err error) {
 			if focus {
 				setTableCell(table, 0, col, value, tcell.ColorYellow)
 			} else {
-				setTableCell(table, 0, col, value, tcell.ColorWhite)
+				setTableCell(table, 0, col, value, tcell.ColorDefault)
 			}
 
 		}
@@ -51,7 +51,7 @@ func showPreview(routeData *route.Data) (err error) {
 			durationStr(routeData.GetGold(i)),
 			durationStr(routeData.GetTimeSave(i)),
 		} {
-			setTableCell(table, i+1, j, value, tcell.ColorWhite)
+			setTableCell(table, i+1, j, value, tcell.ColorDefault)
 		}
 	}
 

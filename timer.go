@@ -60,14 +60,14 @@ func previousSplit(routeData *route.Data, segments []time.Duration) {
 	segments[splitIndex] = 0
 
 	// Make the current row inactive
-	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorDefault)
+	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorDefault)
 
 	// Make the previous row active again.
 	splitIndex--
-	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 2, durationStr(routeData.GetComparisonSegment(splitIndex)), tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 3, durationStr(routeData.GetComparisonSplit(splitIndex)), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 1, placeholder, tcell.ColorDefault)
+	setTableCell(splitsTable, splitIndex, 2, durationStr(routeData.GetComparisonSegment(splitIndex)), tcell.ColorDefault)
+	setTableCell(splitsTable, splitIndex, 3, durationStr(routeData.GetComparisonSplit(splitIndex)), tcell.ColorDefault)
 
 	// Reset the segment time.
 	now := time.Now()
@@ -87,10 +87,10 @@ func nextSplit(routeData *route.Data, segments []time.Duration) {
 
 	plusMinus, plusMinusColor, _ := getPlusMinus(routeData, splitTime)
 
-	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 0, routeData.GetSplitName(splitIndex), tcell.ColorDefault)
 	setTableCell(splitsTable, splitIndex, 1, plusMinus, plusMinusColor)
-	setTableCell(splitsTable, splitIndex, 2, durationStr(segmentTime), tcell.ColorWhite)
-	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorWhite)
+	setTableCell(splitsTable, splitIndex, 2, durationStr(segmentTime), tcell.ColorDefault)
+	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorDefault)
 
 	segments[splitIndex] = segmentTime
 
@@ -129,7 +129,7 @@ func setSplitsTable(routeData *route.Data) {
 			durationStr(routeData.GetComparisonSegment(i)),
 			durationStr(routeData.GetComparisonSplit(i)),
 		} {
-			setTableCell(splitsTable, i, j, value, tcell.ColorWhite)
+			setTableCell(splitsTable, i, j, value, tcell.ColorDefault)
 		}
 	}
 }
