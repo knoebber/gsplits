@@ -145,7 +145,7 @@ func getInputHandler(routeData *route.Data, segments []time.Duration) func(event
 		}
 
 		// splitIndex may have just been incremented by nextSplit()
-		// splitIndex is global variable so this is hard to read.
+		// It is global variable so this is hard to read.
 		// TODO make a better state system for this.
 		if splitIndex == routeData.Length-1 {
 			totalDuration = time.Since(runStart)
@@ -225,6 +225,11 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 		AddItem(segmentTimeView, 0, 1, false).
 		AddItem(nil, 0, 1, false)
 
+	bestPossibleTime := tview.NewFlex().
+		AddItem(newText("Best Possible Time"), 0, 1, false).
+		AddItem(bestPossibleTimeView, 0, 1, false).
+		AddItem(nil, 0, 1, false)
+
 	gold := tview.NewFlex().
 		AddItem(newText("Gold"), 0, 1, false).
 		AddItem(goldView, 0, 1, false).
@@ -235,11 +240,6 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 		AddItem(possibleTimeSaveView, 0, 1, false).
 		AddItem(nil, 0, 1, false)
 
-	bestPossibleTime := tview.NewFlex().
-		AddItem(newText("Best Possible Time"), 0, 1, false).
-		AddItem(bestPossibleTimeView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
-
 	sumOfGold := tview.NewFlex().
 		AddItem(newText("Sum of Gold"), 0, 1, false).
 		AddItem(sumOfGoldView, 0, 1, false).
@@ -248,9 +248,9 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 	return tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(totalTime, 1, 0, false).
 		AddItem(segmentTime, 1, 0, false).
+		AddItem(bestPossibleTime, 1, 0, false).
 		AddItem(gold, 1, 0, false).
 		AddItem(possibleTimeSave, 1, 0, false).
-		AddItem(bestPossibleTime, 1, 0, false).
 		AddItem(sumOfGold, 1, 0, false)
 }
 
