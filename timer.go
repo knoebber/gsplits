@@ -107,8 +107,6 @@ func previousSplit(routeData *route.Data, segments []time.Duration) {
 }
 
 func nextSplit(routeData *route.Data, segments []time.Duration) {
-	// If the last segment is already filled in don't attempt to advance.
-
 	splitTime := time.Since(runStart)
 	segmentTime := time.Since(segmentStart)
 
@@ -259,13 +257,15 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 func getDrawFunc(routeData *route.Data, segments []time.Duration) func() {
 	return func() {
 		runDuration := time.Since(runStart)
+		lastSplit := segmentStart.Sub(runStart)
+		diff := runDuration - routeData.GetComparisonSplit(splitIndex)
 
 		drawCurrentSplitRow(routeData, runDuration)
 		totalTimeView.SetText(elapsedStr(runStart))
 		segmentTimeView.SetText(elapsedStr(segmentStart))
 		goldView.SetText(durationStr(routeData.GetGold(splitIndex)))
 		possibleTimeSaveView.SetText(durationStr(routeData.GetTimeSave(splitIndex)))
-		bestPossibleTimeView.SetText(durationStr(routeData.GetBPT(runDuration, splitIndex)))
+		bestPossibleTimeView.SetText(durationStr(routeData.GetBPT(splitIndex, lastSplit, diff)))
 		sumOfGoldView.SetText(safeDurationStr(routeData.SumOfGold))
 	}
 }

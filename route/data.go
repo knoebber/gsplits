@@ -32,10 +32,9 @@ type Data struct {
 	Length             int             // The number of splits in the route.
 }
 
-// GetBPT gets the "best possible time".
-// It is the current elapsed time added to the rest of the golds left.
-func (d *Data) GetBPT(lastTotal time.Duration, splitIndex int) (bpt time.Duration) {
-	bpt = lastTotal
+// GetBPT gets the "best possible time" - assuming the user doesn't beat any golds.
+func (d *Data) GetBPT(splitIndex int, lastSplit, currentDiff time.Duration) (bpt time.Duration) {
+	bpt = lastSplit
 	if splitIndex >= len(d.Golds) {
 		return
 	}
@@ -44,6 +43,11 @@ func (d *Data) GetBPT(lastTotal time.Duration, splitIndex int) (bpt time.Duratio
 	for _, gold := range remaining {
 		bpt += gold
 	}
+
+	if currentDiff > 0 {
+		bpt += currentDiff
+	}
+
 	return
 }
 
