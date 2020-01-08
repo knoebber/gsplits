@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -30,6 +31,23 @@ var (
 	splitIndex int
 )
 
+func promptSaveRun(routeID int64, segments []time.Duration, totalDuration time.Duration) {
+	modal := tview.NewModal().
+		SetText(fmt.Sprintf("Total Time: %s\nSave Run?", durationStr(totalDuration))).
+		AddButtons([]string{"Yes", "No"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonLabel == "Yes" {
+				_, err := saveRun(routeID, segments, totalDuration)
+				if err != nil {
+					panic(err)
+				}
+			}
+			app.Stop()
+		})
+
+	app.SetRoot(modal, false).SetFocus(modal)
+}
+
 func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Color, bool) {
 	var (
 		lastDiff       time.Duration
@@ -53,10 +71,16 @@ func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Col
 	return plusMinus, plusMinusColor, showPlusMinus
 }
 
+func isDone(segments []time.Duration) bool {
+	// The run is finished once the last segment time is filled in.
+	return segments[len(segments)-1] != 0
+}
+
 func previousSplit(routeData *route.Data, segments []time.Duration) {
 	if splitIndex == 0 {
 		return
 	}
+
 	segments[splitIndex] = 0
 
 	// Make the current row inactive
@@ -78,9 +102,6 @@ func previousSplit(routeData *route.Data, segments []time.Duration) {
 
 func nextSplit(routeData *route.Data, segments []time.Duration) {
 	// If the last segment is already filled in don't attempt to advance.
-	if segments[len(segments)-1] != 0 {
-		return
-	}
 
 	splitTime := time.Since(runStart)
 	segmentTime := time.Since(segmentStart)
@@ -101,18 +122,51 @@ func nextSplit(routeData *route.Data, segments []time.Duration) {
 }
 
 func getInputHandler(routeData *route.Data, segments []time.Duration) func(event *tcell.EventKey) *tcell.EventKey {
+	var totalDuration time.Duration
+
+	handleNextSplit := func() {
+		if isDone(segments) {
+			promptSaveRun(routeData.RouteID, segments, totalDuration)
+		} else {
+			nextSplit(routeData, segments)
+		}
+
+		// splitIndex may have just been incremented by nextSplit()
+		// splitIndex is global variable so this is hard to read.
+		// TODO make a better state system for this.
+		if splitIndex == routeData.Length-1 {
+			totalDuration = time.Since(runStart)
+		}
+	}
+
+	resetRun := func() {
+		// Need to start the goroutine if the splits were already finished.
+		startThread := isDone(segments)
+
+		for i := range segments {
+			segments[i] = 0
+		}
+		splitIndex = 0
+		totalDuration = 0
+		initRun(routeData)
+
+		if startThread {
+			go refresh(routeData, segments)
+		}
+	}
+
 	// Returning nil stops the input from propagating.
 	return func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
+		case 'r':
+			resetRun()
+
 		case ' ':
-			nextSplit(routeData, segments)
+			handleNextSplit()
 			return nil
 		}
 
 		switch event.Key() {
-		case tcell.KeyEnter:
-			nextSplit(routeData, segments)
-			return nil
 		case tcell.KeyCtrlSpace:
 			previousSplit(routeData, segments)
 		}
@@ -121,7 +175,10 @@ func getInputHandler(routeData *route.Data, segments []time.Duration) func(event
 }
 
 func setSplitsTable(routeData *route.Data) {
-	splitsTable = newTable()
+	if splitsTable == nil {
+		splitsTable = newTable()
+	}
+
 	for i := range routeData.SplitNames {
 		for j, value := range []string{
 			routeData.GetSplitName(i),
@@ -201,8 +258,7 @@ func refresh(routeData *route.Data, segments []time.Duration) {
 	tick := time.NewTicker(refreshInterval)
 	drawFunc := getDrawFunc(routeData, segments)
 
-	// Stop redrawing when the last segment is filled in.
-	for segments[len(segments)-1] == 0 {
+	for !isDone(segments) {
 		select {
 		case <-tick.C:
 			app.QueueUpdateDraw(drawFunc)
@@ -210,21 +266,28 @@ func refresh(routeData *route.Data, segments []time.Duration) {
 	}
 }
 
-// func saveRun(routeID int64, durations []time.Duration, totalDuration time.Duration) (runID int64, err error) {
-func startTimer(routeData *route.Data) {
-	segments := make([]time.Duration, routeData.Length)
+func initRun(routeData *route.Data) {
 	now := time.Now()
 	runStart = now
 	segmentStart = now
 
+	setSplitsTable(routeData)
+}
+
+func startTimer(routeData *route.Data) {
+
+	// Segments is the duration that a segment took to complete.
+	segments := make([]time.Duration, routeData.Length)
+
+	initRun(routeData)
+
 	// Times that are redrawn
-	totalTimeView = newText(elapsedStr(now))
-	segmentTimeView = newText(elapsedStr(now))
+	totalTimeView = newText(elapsedStr(runStart))
+	segmentTimeView = newText(elapsedStr(runStart))
 	goldView = newText(durationStr(routeData.GetGold(0)))
 	possibleTimeSaveView = newText(durationStr(routeData.GetTimeSave(0)))
 	bestPossibleTimeView = newText(durationStr(routeData.GetGold(0)))
 
-	setSplitsTable(routeData)
 	container := tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).
 		AddItem(splitsTable, 0, 10, true).
 		AddItem(nil, 0, 1, false).
