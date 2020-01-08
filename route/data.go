@@ -11,9 +11,6 @@ import (
 	"github.com/knoebber/gsplits/split"
 )
 
-// TODO rename splits => segments
-// TODO rename RouteBests ComparisonSegments
-
 // Data contains information about an route.
 // Array values should be pulled by their get methods.
 // Get methods return a zero value if the index does not exist.
