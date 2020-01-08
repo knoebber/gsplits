@@ -27,6 +27,7 @@ var (
 	goldView             *tview.TextView
 	possibleTimeSaveView *tview.TextView
 	bestPossibleTimeView *tview.TextView
+	sumOfGoldView        *tview.TextView
 
 	splitIndex int
 )
@@ -48,27 +49,32 @@ func promptSaveRun(routeID int64, segments []time.Duration, totalDuration time.D
 	app.SetRoot(modal, false).SetFocus(modal)
 }
 
-func getPlusMinus(routeData *route.Data, total time.Duration) (string, tcell.Color, bool) {
-	var (
-		lastDiff       time.Duration
-		plusMinusColor tcell.Color
-	)
+func getPlusMinus(routeData *route.Data, total time.Duration) (plusMinus string, color tcell.Color, show bool) {
+	var lastDiff time.Duration
 
 	diff := total - routeData.GetComparisonSplit(splitIndex)
-	plusMinus := durationStr(diff)
+
+	plusMinus = durationStr(diff)
 	if diff <= 0 {
-		plusMinusColor = tcell.ColorGreen
+		color = tcell.ColorGreen
 	} else {
-		plusMinusColor = tcell.ColorRed
+		color = tcell.ColorRed
 	}
 
 	if splitIndex > 0 {
-		lastDiff = total - routeData.GetComparisonSplit(splitIndex-1)
+		lastSplit := segmentStart.Sub(runStart)
+		lastDiff = (lastSplit - routeData.GetComparisonSplit(splitIndex-1))
 	}
 
-	showPlusMinus := diff > (plusMinusThreshold + (lastDiff * -1))
+	if diff < 0 && lastDiff < 0 {
+		show = diff > plusMinusThreshold+lastDiff
+	} else if diff < 0 {
+		show = diff > plusMinusThreshold
+	} else {
+		show = true
+	}
 
-	return plusMinus, plusMinusColor, showPlusMinus
+	return
 }
 
 func isDone(segments []time.Duration) bool {
@@ -114,6 +120,15 @@ func nextSplit(routeData *route.Data, segments []time.Duration) {
 	setTableCell(splitsTable, splitIndex, 3, durationStr(splitTime), tcell.ColorDefault)
 
 	segments[splitIndex] = segmentTime
+	gold := routeData.GetGold(splitIndex)
+
+	if segmentTime < gold {
+		timeSave := gold - segmentTime
+
+		if routeData.SumOfGold != nil {
+			*routeData.SumOfGold -= timeSave
+		}
+	}
 
 	if splitIndex < routeData.Length-1 {
 		segmentStart = time.Now()
@@ -229,7 +244,7 @@ func createSplitsFlex(routeData *route.Data) *tview.Flex {
 
 	sumOfGold := tview.NewFlex().
 		AddItem(newText("Sum of Gold"), 0, 1, false).
-		AddItem(newText(safeDurationStr(routeData.SumOfGold)), 0, 1, false).
+		AddItem(sumOfGoldView, 0, 1, false).
 		AddItem(nil, 0, 1, false)
 
 	return tview.NewFlex().SetDirection(tview.FlexRow).
@@ -251,6 +266,7 @@ func getDrawFunc(routeData *route.Data, segments []time.Duration) func() {
 		goldView.SetText(durationStr(routeData.GetGold(splitIndex)))
 		possibleTimeSaveView.SetText(durationStr(routeData.GetTimeSave(splitIndex)))
 		bestPossibleTimeView.SetText(durationStr(routeData.GetBPT(runDuration, splitIndex)))
+		sumOfGoldView.SetText(safeDurationStr(routeData.SumOfGold))
 	}
 }
 
@@ -275,18 +291,16 @@ func initRun(routeData *route.Data) {
 }
 
 func startTimer(routeData *route.Data) {
-
-	// Segments is the duration that a segment took to complete.
 	segments := make([]time.Duration, routeData.Length)
 
 	initRun(routeData)
 
-	// Times that are redrawn
 	totalTimeView = newText(elapsedStr(runStart))
 	segmentTimeView = newText(elapsedStr(runStart))
 	goldView = newText(durationStr(routeData.GetGold(0)))
 	possibleTimeSaveView = newText(durationStr(routeData.GetTimeSave(0)))
 	bestPossibleTimeView = newText(durationStr(routeData.GetGold(0)))
+	sumOfGoldView = newText(safeDurationStr(routeData.SumOfGold))
 
 	container := tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).
 		AddItem(splitsTable, 0, 10, true).
