@@ -36,6 +36,10 @@ type Data struct {
 // It is the current elapsed time added to the rest of the golds left.
 func (d *Data) GetBPT(lastTotal time.Duration, splitIndex int) (bpt time.Duration) {
 	bpt = lastTotal
+	if splitIndex >= len(d.Golds) {
+		return
+	}
+
 	remaining := d.Golds[splitIndex:]
 	for _, gold := range remaining {
 		bpt += gold
