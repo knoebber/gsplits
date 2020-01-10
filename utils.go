@@ -15,6 +15,9 @@ const (
 	// The minimum size a duration string will be.
 	// Prevents containers from resizing as the duration size changes sizes.
 	minDurationLength = 10
+
+	// Start showing time save within this many nano seconds
+	plusMinusThreshold = (10 * 1e9) * -1
 )
 
 func newText(text string) *tview.TextView {
