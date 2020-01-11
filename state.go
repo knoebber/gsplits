@@ -106,49 +106,29 @@ func (t *timerState) setSplitsTable() {
 	}
 }
 
-func (t *timerState) createLayout() *tview.Flex {
-	totalTime := tview.NewFlex().
-		AddItem(newText("Total Time"), 0, 1, false).
-		AddItem(t.totalTimeView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
+func (t *timerState) createLayout() *tview.Grid {
+	grid := tview.NewGrid()
+	grid.SetRows(15)
+	grid.SetColumns(4)
+	row := 0
+	tableRowSpan := 10
+	grid.AddItem(t.splitsTable, row, 0, tableRowSpan, 4, 0, 0, true)
 
-	segmentTime := tview.NewFlex().
-		AddItem(newText("Segment Time"), 0, 1, false).
-		AddItem(t.segmentTimeView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
+	row += tableRowSpan + 1 // One extra for some space.
+	for name, val := range map[string]tview.Primitive{
+		"Total Time":         t.totalTimeView,
+		"Segment Time":       t.segmentTimeView,
+		"Best Possible Time": t.bestPossibleTimeView,
+		"Gold":               t.goldView,
+		"Possible Time Save": t.possibleTimeSaveView,
+		"Sum Of Gold":        t.sumOfGoldView,
+	} {
+		grid.AddItem(newText(name), row, 0, 1, 2, 0, 0, false)
+		grid.AddItem(val, row, 3, 1, 1, 0, 0, false)
+		row++
+	}
 
-	bestPossibleTime := tview.NewFlex().
-		AddItem(newText("Best Possible Time"), 0, 1, false).
-		AddItem(t.bestPossibleTimeView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
-
-	gold := tview.NewFlex().
-		AddItem(newText("Gold"), 0, 1, false).
-		AddItem(t.goldView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
-
-	possibleTimeSave := tview.NewFlex().
-		AddItem(newText("Possible Time Save"), 0, 1, false).
-		AddItem(t.possibleTimeSaveView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
-
-	sumOfGold := tview.NewFlex().
-		AddItem(newText("Sum of Gold"), 0, 1, false).
-		AddItem(t.sumOfGoldView, 0, 1, false).
-		AddItem(nil, 0, 1, false)
-
-	splitsFlex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(totalTime, 1, 0, false).
-		AddItem(segmentTime, 1, 0, false).
-		AddItem(bestPossibleTime, 1, 0, false).
-		AddItem(gold, 1, 0, false).
-		AddItem(possibleTimeSave, 1, 0, false).
-		AddItem(sumOfGold, 1, 0, false)
-
-	return tview.NewFlex().SetDirection(tview.FlexRow).SetFullScreen(true).
-		AddItem(t.splitsTable, 0, 10, true).
-		AddItem(nil, 0, 1, false).
-		AddItem(splitsFlex, 0, 4, false)
+	return grid
 }
 
 func (t *timerState) getDrawFunc() func() {
