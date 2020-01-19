@@ -72,6 +72,7 @@ func nextSplit(state *timerState) {
 		if state.sumOfGold != nil {
 			*state.sumOfGold -= timeSave
 		}
+		state.setTableCell(1, plusMinus, tcell.ColorGold)
 	}
 
 	if state.splitIndex < state.routeData.Length-1 {
