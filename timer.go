@@ -83,13 +83,16 @@ func nextSplit(state *timerState) {
 
 func getInputHandler(state *timerState) func(event *tcell.EventKey) *tcell.EventKey {
 	handleNextSplit := func() {
+		// If the run is done and next split is pressed again.
 		if state.isDone() {
 			promptSaveRun(state.routeData.RouteID, state.segments, state.totalDuration)
-		} else {
-			nextSplit(state)
+			return
 		}
 
-		if state.splitIndex == state.routeData.Length-1 {
+		nextSplit(state)
+
+		// If the run is done after pushing next split.
+		if state.isDone() {
 			state.setTotalDuration()
 		}
 	}
