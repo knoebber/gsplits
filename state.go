@@ -107,6 +107,7 @@ func (t *timerState) setSplitsTable() {
 }
 
 func (t *timerState) createLayout() *tview.Grid {
+
 	grid := tview.NewGrid()
 	grid.SetRows(15)
 	grid.SetColumns(4)
@@ -115,16 +116,21 @@ func (t *timerState) createLayout() *tview.Grid {
 	grid.AddItem(t.splitsTable, row, 0, tableRowSpan, 4, 0, 0, true)
 
 	row += tableRowSpan + 1 // One extra for some space.
-	for name, val := range map[string]tview.Primitive{
-		"Total Time":         t.totalTimeView,
-		"Segment Time":       t.segmentTimeView,
-		"Best Possible Time": t.bestPossibleTimeView,
-		"Gold":               t.goldView,
-		"Possible Time Save": t.possibleTimeSaveView,
-		"Sum Of Gold":        t.sumOfGoldView,
+
+	for _, val := range []struct {
+		title string
+		item  tview.Primitive
+	}{
+		{"Total Time", t.totalTimeView},
+		{"Segment Time", t.segmentTimeView},
+		{"Gold", t.goldView},
+		{"Possible Time Save", t.possibleTimeSaveView},
+		{"Best Possible Time", t.bestPossibleTimeView},
+		{"Sum Of Gold", t.sumOfGoldView},
 	} {
-		grid.AddItem(newText(name), row, 0, 1, 2, 0, 0, false)
-		grid.AddItem(val, row, 3, 1, 1, 0, 0, false)
+
+		grid.AddItem(newText(val.title), row, 0, 1, 2, 0, 0, false)
+		grid.AddItem(val.item, row, 3, 1, 1, 0, 0, false)
 		row++
 	}
 
